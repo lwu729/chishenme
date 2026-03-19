@@ -23,6 +23,18 @@ function showToast(msg: string) {
   }
 }
 
+const EMOJI_MAP: Record<string, string> = {
+  菠菜: '🥬', 豆腐: '🫘', 番茄: '🍅', 鸡蛋: '🥚', 香菇: '🍄',
+  鸡胸肉: '🍗', 鸡肉: '🍗', 大蒜: '🧄', 姜: '🌿', 猪肉: '🥩', 牛肉: '🥩',
+  鱼: '🐟', 虾: '🍤', 胡萝卜: '🥕', 白菜: '🥬', 土豆: '🥔',
+  洋葱: '🧅', 青椒: '🫑', 豆芽: '🌱', 牛奶: '🥛', 奶酪: '🧀',
+  苹果: '🍎', 橙子: '🍊', 香蕉: '🍌', 葡萄: '🍇', 草莓: '🍓',
+  西瓜: '🍉', 梨: '🍐', 桃子: '🍑', 柠檬: '🍋', 蓝莓: '🫐',
+};
+function getPlaceholderEmoji(name: string): string {
+  return EMOJI_MAP[name] ?? '🥘';
+}
+
 function formatDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -153,6 +165,12 @@ function ManualInputSheet({
                 locale="zh-CN"
                 style={styles.datePicker}
               />
+            </View>
+
+            {/* 图片占位区 */}
+            <View style={styles.imgPlaceholder}>
+              <Text style={styles.imgPlaceholderEmoji}>{getPlaceholderEmoji(name)}</Text>
+              <Text style={styles.imgPlaceholderText}>图片将在后续版本支持</Text>
             </View>
           </View>
 
@@ -473,6 +491,26 @@ const styles = StyleSheet.create({
   },
   datePicker: {
     flex: 1,
+  },
+
+  // 图片占位区
+  imgPlaceholder: {
+    marginTop: 4,
+    marginBottom: 8,
+    height: 180,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  imgPlaceholderEmoji: {
+    fontSize: 64,
+  },
+  imgPlaceholderText: {
+    fontSize: 12,
+    color: '#AAAAAA',
+    fontFamily: font.family,
   },
 
   // 保存按钮

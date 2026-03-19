@@ -28,10 +28,12 @@ type PillType = 'urgent' | 'warning' | 'fresh' | null;
 
 // 根据食材名推导展示用 emoji（与 index.tsx 共用相同映射）
 const EMOJI_MAP: Record<string, string> = {
-  菠菜: '🥬', 豆腐: '🫙', 番茄: '🍅', 鸡蛋: '🥚', 香菇: '🍄',
-  鸡胸肉: '🍗', 大蒜: '🧄', 姜: '🌿', 猪肉: '🥩', 牛肉: '🥩',
+  菠菜: '🥬', 豆腐: '🫘', 番茄: '🍅', 鸡蛋: '🥚', 香菇: '🍄',
+  鸡胸肉: '🍗', 鸡肉: '🍗', 大蒜: '🧄', 姜: '🌿', 猪肉: '🥩', 牛肉: '🥩',
   鱼: '🐟', 虾: '🍤', 胡萝卜: '🥕', 白菜: '🥬', 土豆: '🥔',
   洋葱: '🧅', 青椒: '🫑', 豆芽: '🌱', 牛奶: '🥛', 奶酪: '🧀',
+  苹果: '🍎', 橙子: '🍊', 香蕉: '🍌', 葡萄: '🍇', 草莓: '🍓',
+  西瓜: '🍉', 梨: '🍐', 桃子: '🍑', 柠檬: '🍋', 蓝莓: '🫐',
 };
 const FALLBACK_EMOJIS = ['🥩', '🥕', '🥦', '🌽', '🍎', '🥛', '🍗', '🧅', '🫙', '🌿'];
 function getEmoji(name: string): string {
@@ -39,6 +41,9 @@ function getEmoji(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
   return FALLBACK_EMOJIS[Math.abs(h) % FALLBACK_EMOJIS.length];
+}
+function getPlaceholderEmoji(name: string): string {
+  return EMOJI_MAP[name] ?? '🥘';
 }
 
 const CARD_BG_PALETTE = [
@@ -177,6 +182,12 @@ function EditModal({
               <Text style={editStyles.infoLabel}>到期日</Text>
               <Text style={editStyles.infoDisabledText}>{item.expiryDate}</Text>
             </View>
+
+            {/* 图片占位区 */}
+            <View style={editStyles.imgPlaceholder}>
+              <Text style={editStyles.imgPlaceholderEmoji}>{getPlaceholderEmoji(item.name)}</Text>
+              <Text style={editStyles.imgPlaceholderText}>图片将在后续版本支持</Text>
+            </View>
           </View>
 
           {/* 按钮 */}
@@ -240,6 +251,7 @@ function FridgeCard({
           <Text style={[styles.ebadgeText, { color: badge.text }]}>● {expiryText}</Text>
         </View>
       </View>
+
     </View>
   );
 }
@@ -641,5 +653,22 @@ const editStyles = StyleSheet.create({
     fontFamily: font.family,
     fontWeight: font.medium,
     color: colors.g800,
+  },
+  imgPlaceholder: {
+    marginTop: 16,
+    height: 180,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  imgPlaceholderEmoji: {
+    fontSize: 64,
+  },
+  imgPlaceholderText: {
+    fontSize: 12,
+    color: '#AAAAAA',
+    fontFamily: font.family,
   },
 });
