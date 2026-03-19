@@ -207,6 +207,9 @@ function ConfirmModal({
             <TouchableOpacity style={cStyles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
               <Text style={cStyles.saveBtnText}>保存并继续</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={cStyles.cancelBtn} onPress={onSkip} activeOpacity={0.85}>
+              <Text style={cStyles.cancelBtnText}>取消</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -226,6 +229,7 @@ function ManualInputSheet({
   const [quantity, setQuantity] = useState(1);
   const [quantityText, setQuantityText] = useState('1');
   const [unit, setUnit] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [kbVisible, setKbVisible] = useState(false);
   const [expiryDate, setExpiryDate] = useState(() => {
     const d = new Date();
@@ -261,6 +265,17 @@ function ManualInputSheet({
     if (selected) setExpiryDate(selected);
   }
 
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { showToast('需要相册权限才能选择图片'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) setImageUri(result.assets[0].uri);
+  }
+
   function handleSave() {
     if (!name.trim()) { showToast('请输入食材名称'); return; }
     if (quantity <= 0) { showToast('数量不能为 0'); return; }
@@ -269,6 +284,7 @@ function ManualInputSheet({
       quantity,
       unit: unit.trim() || '份',
       expiryDate: formatDate(expiryDate),
+      imagePath: imageUri ?? undefined,
     });
   }
 
@@ -344,11 +360,26 @@ function ManualInputSheet({
               />
             </View>
 
-            {/* 图片占位区 */}
-            <View style={styles.imgPlaceholder}>
-              <Text style={styles.imgPlaceholderEmoji}>{getPlaceholderEmoji(name)}</Text>
-              <Text style={styles.imgPlaceholderText}>图片将在后续版本支持</Text>
-            </View>
+            {/* 图片区 */}
+            <TouchableOpacity style={styles.imgPlaceholder} onPress={pickImage} activeOpacity={0.85}>
+              {imageUri ? (
+                <>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.imgChangeOverlay}>
+                    <Text style={styles.imgChangeText}>更换图片</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.imgPlaceholderEmoji}>{getPlaceholderEmoji(name)}</Text>
+                  <Text style={styles.imgPlaceholderText}>点击上传图片</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           <View style={styles.sheetFooter}>
@@ -765,6 +796,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    overflow: 'hidden',
   },
   imgPlaceholderEmoji: {
     fontSize: 64,
@@ -772,6 +804,20 @@ const styles = StyleSheet.create({
   imgPlaceholderText: {
     fontSize: 12,
     color: '#AAAAAA',
+    fontFamily: font.family,
+  },
+  imgChangeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+  },
+  imgChangeText: {
+    fontSize: 13,
+    color: '#FFFFFF',
     fontFamily: font.family,
   },
 
@@ -970,6 +1016,19 @@ const cStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: font.medium,
     color: '#FFFFFF',
+    fontFamily: font.family,
+  },
+  cancelBtn: {
+    backgroundColor: colors.g50,
+    borderRadius: radius.buttonLg,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: font.medium,
+    color: colors.g800,
     fontFamily: font.family,
   },
 });

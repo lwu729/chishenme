@@ -8,6 +8,7 @@ import {
   Alert,
   ToastAndroid,
   Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -58,12 +59,20 @@ function getBadge(status: ExpiryStatus) {
 function IngredientRow({ item }: { item: Ingredient }) {
   const badge = getBadge(item.expiryStatus);
   const expiryText =
-    item.expiryStatus === ExpiryStatus.EXPIRED ? '已过期' : `${item.daysUntilExpiry}天后过期`;
+    item.daysUntilExpiry < 0
+      ? '已过期'
+      : item.daysUntilExpiry === 0
+      ? '已到期'
+      : `${item.daysUntilExpiry}天后过期`;
 
   return (
     <View style={styles.foodRow}>
       <View style={styles.foodThumb}>
-        <Text style={styles.foodEmoji}>{getEmoji(item.name)}</Text>
+        {item.imagePath ? (
+          <Image source={{ uri: item.imagePath }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <Text style={styles.foodEmoji}>{getEmoji(item.name)}</Text>
+        )}
       </View>
       <View style={styles.foodMeta}>
         <Text style={styles.foodName}>{item.name}</Text>
@@ -242,6 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.g50,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   foodEmoji: { fontSize: 24 },
   foodMeta: { flex: 1 },

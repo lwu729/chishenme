@@ -24,7 +24,7 @@ interface IngredientStore {
   addIngredient: (input: AddIngredientInput) => void;
   updateIngredient: (
     id: string,
-    updates: Partial<Pick<Ingredient, 'quantity' | 'remainingPercentage' | 'expiryDate' | 'filterState'>>,
+    updates: Partial<Pick<Ingredient, 'quantity' | 'remainingPercentage' | 'expiryDate' | 'filterState' | 'imagePath'>>,
   ) => void;
   deleteIngredient: (id: string) => void;
   setFilterState: (id: string, state: IngredientFilterState) => void;
@@ -93,6 +93,7 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     if (updates.remainingPercentage !== undefined) { sets.push('remainingPercentage = ?'); vals.push(updates.remainingPercentage); }
     if (updates.expiryDate !== undefined) { sets.push('expiryDate = ?'); vals.push(updates.expiryDate); }
     if (updates.filterState !== undefined) { sets.push('filterState = ?'); vals.push(updates.filterState); }
+    if (updates.imagePath !== undefined) { sets.push('imagePath = ?'); vals.push(updates.imagePath ?? null); }
 
     if (sets.length === 0) return;
     vals.push(id);

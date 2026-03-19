@@ -45,10 +45,10 @@ export function calculateExpiryStatus(
  * 返回今天到过期日的天数。已过期返回负数。
  */
 export function calculateDaysUntilExpiry(expiryDate: string): number {
+  const [year, month, day] = expiryDate.split('-').map(Number);
+  const expiry = new Date(year, month - 1, day); // 本地日期，避免 UTC 解析偏移
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDate);
-  expiry.setHours(0, 0, 0, 0);
   return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 

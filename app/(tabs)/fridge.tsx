@@ -10,8 +10,10 @@ import {
   ToastAndroid,
   KeyboardAvoidingView,
   Keyboard,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
 import { useIngredientStore } from '../../src/features/ingredient/store';
 import { colors, font, radius } from '../../src/constants/theme';
@@ -84,11 +86,12 @@ function EditModal({
 }: {
   item: Ingredient;
   onClose: () => void;
-  onSave: (id: string, quantity: number, remainingPercentage: number) => void;
+  onSave: (id: string, quantity: number, remainingPercentage: number, imagePath: string | null) => void;
 }) {
   const max = item.originalQuantity;
   const [quantity, setQuantity] = useState(item.quantity);
   const [quantityText, setQuantityText] = useState(String(item.quantity));
+  const [imageUri, setImageUri] = useState<string | null>(item.imagePath ?? null);
   const [kbVisible, setKbVisible] = useState(false);
 
   useEffect(() => {
@@ -127,10 +130,21 @@ function EditModal({
     }
   }
 
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { showToast('需要相册权限才能选择图片'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) setImageUri(result.assets[0].uri);
+  }
+
   function handleSave() {
     if (quantity <= 0) { showToast('数量不能为 0'); return; }
     const remaining = Math.round((quantity / max) * 100);
-    onSave(item.id, quantity, remaining);
+    onSave(item.id, quantity, remaining, imageUri);
   }
 
   const atMax = quantity >= max;
@@ -197,11 +211,26 @@ function EditModal({
               <Text style={editStyles.infoDisabledText}>{item.expiryDate}</Text>
             </View>
 
-            {/* 图片占位区 */}
-            <View style={editStyles.imgPlaceholder}>
-              <Text style={editStyles.imgPlaceholderEmoji}>{getPlaceholderEmoji(item.name)}</Text>
-              <Text style={editStyles.imgPlaceholderText}>图片将在后续版本支持</Text>
-            </View>
+            {/* 图片区 */}
+            <TouchableOpacity style={editStyles.imgPlaceholder} onPress={pickImage} activeOpacity={0.85}>
+              {imageUri ? (
+                <>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
+                    resizeMode="cover"
+                  />
+                  <View style={editStyles.imgChangeOverlay}>
+                    <Text style={editStyles.imgChangeText}>更换图片</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={editStyles.imgPlaceholderEmoji}>{getPlaceholderEmoji(item.name)}</Text>
+                  <Text style={editStyles.imgPlaceholderText}>点击上传图片</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* 按钮 */}
@@ -230,14 +259,20 @@ function FridgeCard({
 }) {
   const badge = getBadge(item.expiryStatus);
   const expiryText =
-    item.expiryStatus === ExpiryStatus.EXPIRED
+    item.daysUntilExpiry < 0
       ? '已过期'
+      : item.daysUntilExpiry === 0
+      ? '已到期'
       : `还有${item.daysUntilExpiry}天到期`;
 
   return (
     <View style={styles.fcard}>
-      <View style={[styles.fcardImg, { backgroundColor: getCardBg(item.id) }]}>
-        <Text style={styles.fcardEmoji}>{getEmoji(item.name)}</Text>
+      <View style={[styles.fcardImg, !item.imagePath && { backgroundColor: getCardBg(item.id) }]}>
+        {item.imagePath ? (
+          <Image source={{ uri: item.imagePath }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <Text style={styles.fcardEmoji}>{getEmoji(item.name)}</Text>
+        )}
         <View style={styles.fcardActs}>
           <TouchableOpacity
             style={[styles.actBtn, styles.delBtn]}
@@ -294,8 +329,8 @@ export default function FridgeScreen() {
     setActivePill(prev => (prev === pill ? null : pill));
   }
 
-  function handleSaveEdit(id: string, quantity: number, remainingPercentage: number) {
-    updateIngredient(id, { quantity, remainingPercentage });
+  function handleSaveEdit(id: string, quantity: number, remainingPercentage: number, imagePath: string | null) {
+    updateIngredient(id, { quantity, remainingPercentage, imagePath: imagePath ?? undefined });
     setEditingItem(null);
   }
 
@@ -466,7 +501,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  delBtn: { backgroundColor: 'rgba(232,85,85,0.16)' },
+  delBtn: { backgroundColor: colors.red },
   editBtn: { backgroundColor: 'rgba(255,255,255,0.92)' },
   fcardInfo: {
     paddingHorizontal: 16,
@@ -680,6 +715,7 @@ const editStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    overflow: 'hidden',
   },
   imgPlaceholderEmoji: {
     fontSize: 64,
@@ -687,6 +723,20 @@ const editStyles = StyleSheet.create({
   imgPlaceholderText: {
     fontSize: 12,
     color: '#AAAAAA',
+    fontFamily: font.family,
+  },
+  imgChangeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+  },
+  imgChangeText: {
+    fontSize: 13,
+    color: '#FFFFFF',
     fontFamily: font.family,
   },
 });
