@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,10 @@ import {
   Image,
   ActivityIndicator,
   ScrollView,
+  Animated,
+  Easing,
+  Dimensions,
+  LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -76,6 +80,11 @@ function ConfirmModal({
   const [unit, setUnit] = useState(item.unit);
   const [expiryDate, setExpiryDate] = useState(() => addDays(item.estimatedExpiryDays));
   const [kbVisible, setKbVisible] = useState(false);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [previewSize, setPreviewSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 180,
+  });
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -88,6 +97,22 @@ function ConfirmModal({
     );
     return () => { show.remove(); hide.remove(); };
   }, []);
+
+  useEffect(() => {
+    setName(item.name);
+    setQuantity(item.quantity);
+    setQuantityText(String(item.quantity));
+    setUnit(item.unit);
+    setExpiryDate(addDays(item.estimatedExpiryDays));
+  }, [item]);
+
+  useEffect(() => {
+    Image.getSize(
+      photoUri,
+      (width, height) => setImageSize({ width, height }),
+      () => setImageSize(null),
+    );
+  }, [photoUri]);
 
   function adjustQuantity(delta: number) {
     const next = Math.max(0, parseFloat(((quantity + delta) * 10).toFixed(0)) / 10);
@@ -105,6 +130,11 @@ function ConfirmModal({
     if (selected) setExpiryDate(selected);
   }
 
+  function onPreviewLayout(e: LayoutChangeEvent) {
+    const { width, height } = e.nativeEvent.layout;
+    setPreviewSize({ width, height });
+  }
+
   function handleSave() {
     if (!name.trim()) { showToast('请输入食材名称'); return; }
     if (quantity <= 0) { showToast('数量不能为 0'); return; }
@@ -116,6 +146,38 @@ function ConfirmModal({
       imagePath: photoUri,
     });
   }
+
+  const cropStyle = useMemo(() => {
+    const box = item.boundingBox;
+    if (!box || !imageSize || previewSize.width <= 0 || previewSize.height <= 0) {
+      return null;
+    }
+
+    const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+    const x = clamp01(box.x);
+    const y = clamp01(box.y);
+    const w = Math.max(0.05, clamp01(box.width));
+    const h = Math.max(0.05, clamp01(box.height));
+
+    const srcW = imageSize.width;
+    const srcH = imageSize.height;
+    const targetW = previewSize.width;
+    const targetH = previewSize.height;
+
+    const scale = Math.max(targetW / (srcW * w), targetH / (srcH * h));
+    const scaledW = srcW * scale;
+    const scaledH = srcH * scale;
+
+    const centerX = (x + w / 2) * srcW * scale;
+    const centerY = (y + h / 2) * srcH * scale;
+
+    const minLeft = targetW - scaledW;
+    const minTop = targetH - scaledH;
+    const left = Math.min(0, Math.max(minLeft, targetW / 2 - centerX));
+    const top = Math.min(0, Math.max(minTop, targetH / 2 - centerY));
+
+    return { width: scaledW, height: scaledH, left, top };
+  }, [item.boundingBox, imageSize, previewSize.height, previewSize.width]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -198,8 +260,18 @@ function ConfirmModal({
               />
             </View>
 
-            {/* 照片区域 */}
-            <Image source={{ uri: photoUri }} style={cStyles.photoPreview} resizeMode="cover" />
+            {/* 照片区域（有 boundingBox 时 zoom 到该食材） */}
+            <View style={cStyles.photoPreview} onLayout={onPreviewLayout}>
+              {cropStyle ? (
+                <Image
+                  source={{ uri: photoUri }}
+                  style={[cStyles.photoCropImage, cropStyle]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Image source={{ uri: photoUri }} style={cStyles.photoCoverImage} resizeMode="cover" />
+              )}
+            </View>
           </ScrollView>
 
           {/* 底部按钮 */}
@@ -395,15 +467,42 @@ function ManualInputSheet({
 
 // ─── 主屏幕 ───
 export default function ScanScreen() {
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  const CARD_SWITCH_DURATION = 250;
   const [modalVisible, setModalVisible] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanQueue, setScanQueue] = useState<ScannedIngredient[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [photoUri, setPhotoUri] = useState('');
   const [savedCount, setSavedCount] = useState(0);
+  const slideX = useRef(new Animated.Value(0)).current;
   const addIngredient = useIngredientStore(s => s.addIngredient);
 
   const showingConfirm = scanQueue.length > 0 && currentIndex < scanQueue.length;
+
+  function animateToNext(next: number) {
+    Animated.timing(slideX, {
+      toValue: -SCREEN_WIDTH,
+      duration: CARD_SWITCH_DURATION,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentIndex(next);
+      slideX.setValue(SCREEN_WIDTH);
+      Animated.timing(slideX, {
+        toValue: 0,
+        duration: CARD_SWITCH_DURATION,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+  }
+
+  function finishConfirmFlow() {
+    setScanQueue([]);
+    setCurrentIndex(0);
+    slideX.setValue(0);
+  }
 
   async function handleScan() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -437,6 +536,7 @@ export default function ScanScreen() {
       }
       setScanQueue(items);
       setCurrentIndex(0);
+      slideX.setValue(0);
     } catch (e) {
       console.error(e);
       showToast('识别失败，请检查网络或重试');
@@ -450,22 +550,20 @@ export default function ScanScreen() {
     const next = currentIndex + 1;
     setSavedCount(c => c + 1);
     if (next >= scanQueue.length) {
-      setScanQueue([]);
-      setCurrentIndex(0);
+      finishConfirmFlow();
       showToast(`已保存 ${savedCount + 1} 个食材 ✓`);
     } else {
-      setCurrentIndex(next);
+      animateToNext(next);
     }
   }
 
   function handleSkip() {
     const next = currentIndex + 1;
     if (next >= scanQueue.length) {
-      setScanQueue([]);
-      setCurrentIndex(0);
+      finishConfirmFlow();
       if (savedCount > 0) showToast(`已保存 ${savedCount} 个食材 ✓`);
     } else {
-      setCurrentIndex(next);
+      animateToNext(next);
     }
   }
 
@@ -533,14 +631,16 @@ export default function ScanScreen() {
 
       {/* AI 识别确认 Modal */}
       {showingConfirm && (
-        <ConfirmModal
-          item={scanQueue[currentIndex]}
-          index={currentIndex + 1}
-          total={scanQueue.length}
-          photoUri={photoUri}
-          onSave={handleConfirmSave}
-          onSkip={handleSkip}
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: slideX }] }]}>
+          <ConfirmModal
+            item={scanQueue[currentIndex]}
+            index={currentIndex + 1}
+            total={scanQueue.length}
+            photoUri={photoUri}
+            onSave={handleConfirmSave}
+            onSkip={handleSkip}
+          />
+        </Animated.View>
       )}
     </SafeAreaView>
   );
@@ -998,6 +1098,15 @@ const cStyles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     backgroundColor: '#F2F2F2',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoCoverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoCropImage: {
+    position: 'absolute',
   },
   sheetFooter: {
     paddingHorizontal: 20,
