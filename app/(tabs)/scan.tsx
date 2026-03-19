@@ -9,7 +9,6 @@ import {
   Alert,
   ToastAndroid,
   KeyboardAvoidingView,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -77,35 +76,30 @@ function ManualInputSheet({
   }
 
   return (
-    // 遮罩层
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* 遮罩 */}
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} />
 
-      {/* Sheet 本体 */}
+      {/* 居中卡片 */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'position' : 'height'}
         style={styles.sheetWrap}
         pointerEvents="box-none"
       >
         <View style={styles.sheet}>
-          {/* ── 顶部关闭按钮 ── */}
+          {/* ── 关闭按钮 ── */}
           <View style={styles.sheetHeader}>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.sheetBody}
-          >
+          <View style={styles.sheetBody}>
             {/* ── 食材数量 ── */}
             <Text style={styles.sectionTitle}>食材数量</Text>
             <View style={styles.sectionDivider} />
 
             <View style={styles.quantityRow}>
-              {/* 步进器 */}
               <View style={styles.stepperGroup}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => adjustQuantity(-0.5)}>
                   <Text style={styles.stepBtnText}>−</Text>
@@ -124,7 +118,6 @@ function ManualInputSheet({
 
               <View style={styles.quantityDivider} />
 
-              {/* 单位 */}
               <TextInput
                 style={styles.unitInput}
                 value={unit}
@@ -135,10 +128,9 @@ function ManualInputSheet({
             </View>
 
             {/* ── 食材信息 ── */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>食材信息</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>食材信息</Text>
             <View style={styles.sectionDivider} />
 
-            {/* 食材名称 */}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>食材名称</Text>
               <TextInput
@@ -150,7 +142,6 @@ function ManualInputSheet({
               />
             </View>
 
-            {/* 到期日 */}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>到期日</Text>
               <DateTimePicker
@@ -163,7 +154,7 @@ function ManualInputSheet({
                 style={styles.datePicker}
               />
             </View>
-          </ScrollView>
+          </View>
 
           {/* ── 保存按钮 ── */}
           <View style={styles.sheetFooter}>
@@ -346,27 +337,28 @@ const styles = StyleSheet.create({
     fontFamily: font.family,
   },
 
-  // ── Bottom sheet ──
+  // ── 居中弹窗 ──
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   sheetWrap: {
     position: 'absolute',
+    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
   sheet: {
     backgroundColor: colors.backgroundCard,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 16,
-    maxHeight: '85%',
+    borderRadius: 24,
+    paddingBottom: 20,
   },
   sheetHeader: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 18,
     paddingBottom: 4,
   },
   closeBtn: {
@@ -384,7 +376,7 @@ const styles = StyleSheet.create({
   },
   sheetBody: {
     paddingHorizontal: 24,
-    paddingBottom: 12,
+    paddingTop: 4,
   },
 
   // 分区标题
@@ -466,7 +458,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.g800,
     fontFamily: font.family,
-    width: 56,
+    width: 68,
     flexShrink: 0,
   },
   infoInput: {
@@ -486,10 +478,7 @@ const styles = StyleSheet.create({
   // 保存按钮
   sheetFooter: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.g100,
+    paddingTop: 16,
   },
   saveBtn: {
     backgroundColor: colors.backgroundCard,
