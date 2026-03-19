@@ -9,6 +9,7 @@ import {
   Alert,
   ToastAndroid,
   KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
@@ -88,6 +89,19 @@ function EditModal({
   const max = item.originalQuantity;
   const [quantity, setQuantity] = useState(item.quantity);
   const [quantityText, setQuantityText] = useState(String(item.quantity));
+  const [kbVisible, setKbVisible] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKbVisible(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKbVisible(false),
+    );
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   function adjustQuantity(delta: number) {
     const next = Math.max(0, Math.min(max, parseFloat(((quantity + delta) * 10).toFixed(0)) / 10));
@@ -125,8 +139,8 @@ function EditModal({
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <TouchableOpacity style={editStyles.overlay} activeOpacity={1} onPress={onClose} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'position' : 'height'}
-        style={editStyles.sheetWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[editStyles.sheetWrap, kbVisible && editStyles.sheetWrapKeyboard]}
         pointerEvents="box-none"
       >
         <View style={editStyles.sheet}>
@@ -175,7 +189,7 @@ function EditModal({
 
             <View style={editStyles.infoRow}>
               <Text style={editStyles.infoLabel}>食材名称</Text>
-              <Text style={editStyles.infoValueText}>{item.name}</Text>
+              <Text style={editStyles.infoDisabledText}>{item.name}</Text>
             </View>
 
             <View style={editStyles.infoRow}>
@@ -508,6 +522,10 @@ const editStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     pointerEvents: 'box-none',
+  },
+  sheetWrapKeyboard: {
+    justifyContent: 'flex-end',
+    paddingBottom: 16,
   },
   sheet: {
     backgroundColor: colors.backgroundCard,

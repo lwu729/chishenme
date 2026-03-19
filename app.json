@@ -36,7 +36,15 @@
           "useSQLCipher": false
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "吃什么需要访问相机来拍摄食材照片",
+          "microphonePermission": false,
+          "photosPermission": "吃什么需要访问相册来选择食材照片"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

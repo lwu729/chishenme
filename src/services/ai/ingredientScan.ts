@@ -1,14 +1,42 @@
-import { Ingredient } from '../../features/ingredient/types';
+import { callClaudeWithImage } from './claudeClient';
+
+export interface ScannedIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  estimatedExpiryDays: number;
+}
+
+const SYSTEM_PROMPT = `你是一个食材识别助手。用户会发送食物或超市货架的照片，请识别图片中所有可见的食材。
+严格只返回 JSON，格式如下，不要任何额外文字或 markdown：
+{
+  "ingredients": [
+    {
+      "name": "食材名称（中文）",
+      "quantity": 数字,
+      "unit": "单位",
+      "estimatedExpiryDays": 建议保存天数（整数，从今天开始）
+    }
+  ]
+}
+识别规则：
+- 如果看到包装食品，尽量从标签读取保质期并换算成天数
+- 如果是散装蔬菜/水果，根据常识给出建议保存天数
+- 单位使用中文日常表达（碗/杯/个/把/汤匙/克/毫升等）
+- 数量用合理的估算值，不要为 0
+- 只识别食材，不要识别餐具、背景物品等`;
 
 /**
- * 识别图片中的食材，返回部分填充的 Ingredient 数组（不含 id、loggedDate 等需要客户端补全的字段）。
- * @param imageBase64 - Base64 编码的图片字符串
+ * 识别图片中的食材，返回 ScannedIngredient 数组。
  */
-export async function scanIngredient(imageBase64: string): Promise<Partial<Ingredient>[]> {
-  // TODO: 实现食材识别
-  // - 构建包含图片的 vision prompt
-  // - 调用 callClaude 或直接调用 Claude API（支持 vision）
-  // - 解析返回的 JSON，提取 name / quantity / unit / expiryDate / storageLocation
-  // - 返回 Partial<Ingredient>[] 供调用方补全剩余字段
-  throw new Error('TODO: scanIngredient not implemented');
+export async function scanIngredient(
+  imageBase64: string,
+  mediaType: string,
+): Promise<ScannedIngredient[]> {
+  const raw = await callClaudeWithImage(SYSTEM_PROMPT, imageBase64, mediaType);
+
+  // 去掉可能存在的 markdown code block
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  const parsed = JSON.parse(cleaned) as { ingredients: ScannedIngredient[] };
+  return parsed.ingredients;
 }

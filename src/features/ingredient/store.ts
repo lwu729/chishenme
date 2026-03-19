@@ -15,6 +15,7 @@ export interface AddIngredientInput {
   quantity: number;
   unit: string;
   expiryDate: string; // 'YYYY-MM-DD'
+  imagePath?: string; // 本地图片 URI（可选）
 }
 
 interface IngredientStore {
@@ -71,7 +72,7 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
         input.expiryDate,
         today,
         days,
-        null,
+        input.imagePath ?? null,
         100,
         input.quantity,
         StorageLocation.ROOM_TEMP,
