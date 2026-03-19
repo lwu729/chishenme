@@ -12,6 +12,7 @@ export const CREATE_INGREDIENTS_TABLE = `
     daysUntilExpiry    INTEGER NOT NULL,
     imagePath          TEXT,
     remainingPercentage REAL   NOT NULL,
+    originalQuantity   REAL   NOT NULL DEFAULT 0,
     storageLocation    TEXT    NOT NULL,
     expiryStatus       TEXT    NOT NULL,
     filterState        TEXT    NOT NULL DEFAULT 'null'

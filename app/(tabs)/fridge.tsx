@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   ToastAndroid,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
@@ -69,12 +70,138 @@ function getItemPill(item: Ingredient): PillType {
   return 'fresh';
 }
 
+// ─── 编辑 Modal ───
+function EditModal({
+  item,
+  onClose,
+  onSave,
+}: {
+  item: Ingredient;
+  onClose: () => void;
+  onSave: (id: string, quantity: number, remainingPercentage: number) => void;
+}) {
+  const max = item.originalQuantity;
+  const [quantity, setQuantity] = useState(item.quantity);
+  const [quantityText, setQuantityText] = useState(String(item.quantity));
+
+  function adjustQuantity(delta: number) {
+    const next = Math.max(0, Math.min(max, parseFloat(((quantity + delta) * 10).toFixed(0)) / 10));
+    setQuantity(next);
+    setQuantityText(String(next));
+  }
+
+  function onQuantityTextChange(text: string) {
+    setQuantityText(text);
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed) && parsed >= 0) setQuantity(Math.min(parsed, max));
+  }
+
+  function onQuantityBlur() {
+    const parsed = parseFloat(quantityText);
+    if (isNaN(parsed) || parsed < 0) {
+      setQuantity(0);
+      setQuantityText('0');
+    } else if (parsed > max) {
+      setQuantity(max);
+      setQuantityText(String(max));
+      showToast(`数量不可超过原始录入量 ${max}${item.unit}`);
+    }
+  }
+
+  function handleSave() {
+    if (quantity <= 0) { showToast('数量不能为 0'); return; }
+    const remaining = Math.round((quantity / max) * 100);
+    onSave(item.id, quantity, remaining);
+  }
+
+  const atMax = quantity >= max;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <TouchableOpacity style={editStyles.overlay} activeOpacity={1} onPress={onClose} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'position' : 'height'}
+        style={editStyles.sheetWrap}
+        pointerEvents="box-none"
+      >
+        <View style={editStyles.sheet}>
+          {/* 关闭按钮 */}
+          <View style={editStyles.sheetHeader}>
+            <TouchableOpacity onPress={onClose} style={editStyles.closeBtn}>
+              <Text style={editStyles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={editStyles.sheetBody}>
+            {/* 食材数量 */}
+            <Text style={editStyles.sectionTitle}>食材数量</Text>
+            <View style={editStyles.sectionDivider} />
+
+            <View style={editStyles.quantityRow}>
+              <View style={editStyles.stepperGroup}>
+                <TouchableOpacity style={editStyles.stepBtn} onPress={() => adjustQuantity(-0.5)}>
+                  <Text style={editStyles.stepBtnText}>−</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={editStyles.quantityInput}
+                  value={quantityText}
+                  onChangeText={onQuantityTextChange}
+                  onBlur={onQuantityBlur}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+                <TouchableOpacity
+                  style={[editStyles.stepBtn, atMax && editStyles.stepBtnDisabled]}
+                  onPress={() => !atMax && adjustQuantity(0.5)}
+                  disabled={atMax}
+                >
+                  <Text style={[editStyles.stepBtnText, atMax && editStyles.stepBtnTextDisabled]}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={editStyles.quantityDivider} />
+
+              <Text style={editStyles.unitText}>{item.unit}</Text>
+            </View>
+
+            {/* 食材信息 */}
+            <Text style={[editStyles.sectionTitle, { marginTop: 24 }]}>食材信息</Text>
+            <View style={editStyles.sectionDivider} />
+
+            <View style={editStyles.infoRow}>
+              <Text style={editStyles.infoLabel}>食材名称</Text>
+              <Text style={editStyles.infoValueText}>{item.name}</Text>
+            </View>
+
+            <View style={editStyles.infoRow}>
+              <Text style={editStyles.infoLabel}>到期日</Text>
+              <Text style={editStyles.infoDisabledText}>{item.expiryDate}</Text>
+            </View>
+          </View>
+
+          {/* 按钮 */}
+          <View style={editStyles.sheetFooter}>
+            <TouchableOpacity style={editStyles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
+              <Text style={editStyles.saveBtnText}>保存</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={editStyles.cancelBtn} onPress={onClose} activeOpacity={0.85}>
+              <Text style={editStyles.cancelBtnText}>取消</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
 function FridgeCard({
   item,
   onDelete,
+  onEdit,
 }: {
   item: Ingredient;
   onDelete: (id: string, name: string) => void;
+  onEdit: (item: Ingredient) => void;
 }) {
   const badge = getBadge(item.expiryStatus);
   const expiryText =
@@ -95,7 +222,7 @@ function FridgeCard({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actBtn, styles.editBtn]}
-            onPress={() => showToast('编辑开发中')}
+            onPress={() => onEdit(item)}
           >
             <Text style={{ fontSize: 16 }}>✏️</Text>
           </TouchableOpacity>
@@ -120,7 +247,8 @@ function FridgeCard({
 export default function FridgeScreen() {
   const [searchText, setSearchText] = useState('');
   const [activePill, setActivePill] = useState<PillType>(null);
-  const { ingredients, loadIngredients, deleteIngredient } = useIngredientStore();
+  const [editingItem, setEditingItem] = useState<Ingredient | null>(null);
+  const { ingredients, loadIngredients, deleteIngredient, updateIngredient } = useIngredientStore();
 
   useEffect(() => {
     loadIngredients();
@@ -138,6 +266,11 @@ export default function FridgeScreen() {
 
   function togglePill(pill: PillType) {
     setActivePill(prev => (prev === pill ? null : pill));
+  }
+
+  function handleSaveEdit(id: string, quantity: number, remainingPercentage: number) {
+    updateIngredient(id, { quantity, remainingPercentage });
+    setEditingItem(null);
   }
 
   function handleDelete(id: string, name: string) {
@@ -197,7 +330,7 @@ export default function FridgeScreen() {
       {/* 食材卡片列表 */}
       <CustomScrollView contentContainerStyle={styles.cardList}>
         {displayItems.map(item => (
-          <FridgeCard key={item.id} item={item} onDelete={handleDelete} />
+          <FridgeCard key={item.id} item={item} onDelete={handleDelete} onEdit={setEditingItem} />
         ))}
         {displayItems.length === 0 && (
           <View style={styles.emptyState}>
@@ -207,6 +340,13 @@ export default function FridgeScreen() {
           </View>
         )}
       </CustomScrollView>
+      {editingItem && (
+        <EditModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -339,5 +479,167 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#AAAAAA',
     fontFamily: font.family,
+  },
+});
+
+const editStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheetWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    pointerEvents: 'box-none',
+  },
+  sheet: {
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  sheetHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+    alignItems: 'flex-end',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.g50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: {
+    fontSize: 14,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  sheetBody: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: '#AAAAAA',
+    marginBottom: 6,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: colors.g100,
+    marginBottom: 14,
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  stepperGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.g50,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  stepBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.g100,
+  },
+  stepBtnDisabled: {
+    backgroundColor: '#F0F0F0',
+  },
+  stepBtnText: {
+    fontSize: 20,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  stepBtnTextDisabled: {
+    color: '#CCCCCC',
+  },
+  quantityInput: {
+    width: 64,
+    textAlign: 'center',
+    fontSize: 18,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: colors.g800,
+    paddingVertical: 6,
+  },
+  quantityDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.g100,
+  },
+  unitText: {
+    fontSize: 15,
+    fontFamily: font.family,
+    color: colors.g800,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.g50,
+  },
+  infoLabel: {
+    width: 72,
+    fontSize: 14,
+    fontFamily: font.family,
+    color: '#AAAAAA',
+  },
+  infoValueText: {
+    fontSize: 15,
+    fontFamily: font.family,
+    color: colors.g800,
+  },
+  infoDisabledText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: font.family,
+    color: '#CCCCCC',
+  },
+  sheetFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  saveBtn: {
+    backgroundColor: colors.g600,
+    borderRadius: radius.buttonLg,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: '#FFFFFF',
+  },
+  cancelBtn: {
+    backgroundColor: colors.g50,
+    borderRadius: radius.buttonLg,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: colors.g800,
   },
 });

@@ -30,6 +30,7 @@ export interface Ingredient {
   daysUntilExpiry: number; // 计算得出：expiryDate - today
   imagePath: string | null;
   remainingPercentage: number; // 还需要消耗的百分比（100 = 全新，0 = 用完）
+  originalQuantity: number; // 录入时的原始数量，用于计算 remainingPercentage 上限
   storageLocation: StorageLocation;
   expiryStatus: ExpiryStatus; // 计算得出
   filterState: IngredientFilterState; // 用于菜谱生成

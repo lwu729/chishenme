@@ -61,8 +61,8 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     db.runSync(
       `INSERT INTO ingredients
          (id, name, quantity, unit, expiryDate, loggedDate, daysUntilExpiry,
-          imagePath, remainingPercentage, storageLocation, expiryStatus, filterState)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          imagePath, remainingPercentage, originalQuantity, storageLocation, expiryStatus, filterState)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.name,
@@ -73,6 +73,7 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
         days,
         null,
         100,
+        input.quantity,
         StorageLocation.ROOM_TEMP,
         status,
         IngredientFilterState.NULL,

@@ -35,4 +35,19 @@ export function initDatabase(): void {
 
   database.execSync(INSERT_DEFAULT_USER_EVENT);
   database.execSync(INSERT_DEFAULT_USER_PREFERENCE);
+
+  // 迁移：为已存在的数据库添加 originalQuantity 列（如果尚不存在）
+  try {
+    database.execSync(
+      'ALTER TABLE ingredients ADD COLUMN originalQuantity REAL NOT NULL DEFAULT 0',
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  // 迁移：将 originalQuantity = 0 的旧数据补填为当前 quantity，
+  // 确保编辑数量上限始终锁定在最初录入时的数量。
+  database.execSync(
+    'UPDATE ingredients SET originalQuantity = quantity WHERE originalQuantity = 0',
+  );
 }
