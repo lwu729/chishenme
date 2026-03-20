@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, font, radius } from '../../src/constants/theme';
 import CustomScrollView from '../../src/components/CustomScrollView';
 import { useIngredientStore } from '../../src/features/ingredient/store';
-import { useRecipeStore } from '../../src/features/recipe/store';
+import { useRecipeStore, hasConditionsChanged } from '../../src/features/recipe/store';
 import { useUserStore } from '../../src/features/user/store';
 import { Recipe, RecipeSortOrder } from '../../src/features/recipe/types';
 import { IngredientFilterState } from '../../src/features/ingredient/types';
 import { UserPreference } from '../../src/features/user/types';
+import type { RecipeGenerationContext } from '../../src/services/ai/recipeGenerate';
 
 function showToast(msg: string) {
   if (Platform.OS === 'android') {
@@ -27,6 +29,13 @@ function showToast(msg: string) {
   } else {
     Alert.alert('', msg, [{ text: '好的' }]);
   }
+}
+
+function formatGenerationAgeLabel(createdAtIso: string): string {
+  const ms = Date.now() - new Date(createdAtIso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return '根据刚刚的食材生成';
+  return `根据 ${mins} 分钟前的食材生成`;
 }
 
 const DEFAULT_PREFERENCE: UserPreference = {
@@ -202,7 +211,7 @@ function RecipeCard({
     <TouchableOpacity
       style={styles.rcard}
       activeOpacity={0.85}
-      onPress={() => router.push(`/recipe/${recipe.id}`)}
+      onPress={() => router.push({ pathname: '/recipe-detail', params: { id: recipe.id } })}
     >
       <View
         style={[styles.rcardImg, { backgroundColor: CARD_COLORS[index % CARD_COLORS.length] }]}
@@ -270,8 +279,32 @@ export default function RecipesScreen() {
     generateAndSetRecipes,
     toggleFavorite,
     loadFavoritedRecipes,
+    lastGenerationSnapshot,
   } = useRecipeStore();
   const { userPreference, loadUserPreference } = useUserStore();
+
+  /** 用户从结果页点「返回」后，切走再回 tab 时不自动回到结果页 */
+  const userChoseFilterRef = useRef(false);
+
+  const buildGenerationContext = useCallback((): RecipeGenerationContext => {
+    const included = ingredients
+      .filter(i => i.filterState === IngredientFilterState.INCLUDE)
+      .map(i => i.id);
+    const excluded = ingredients
+      .filter(i => i.filterState === IngredientFilterState.EXCLUDE)
+      .map(i => i.id);
+    return {
+      availableIngredients: ingredients,
+      includedIngredientIds: included,
+      excludedIngredientIds: excluded,
+      selectedCuisines: cuisines,
+      selectedCookingMethods: methods,
+      selectedFlavors: tastes,
+      userPreference: userPreference ?? DEFAULT_PREFERENCE,
+      favoritedRecipes,
+      sortOrder,
+    };
+  }, [ingredients, cuisines, methods, tastes, userPreference, favoritedRecipes, sortOrder]);
 
   useEffect(() => {
     loadIngredients();
@@ -279,30 +312,36 @@ export default function RecipesScreen() {
     loadUserPreference();
   }, []);
 
-  async function handleGenerate() {
-    const included = ingredients
-      .filter(i => i.filterState === IngredientFilterState.INCLUDE)
-      .map(i => i.id);
-    const excluded = ingredients
-      .filter(i => i.filterState === IngredientFilterState.EXCLUDE)
-      .map(i => i.id);
+  useFocusEffect(
+    useCallback(() => {
+      if (userChoseFilterRef.current) return;
+      const ctx = buildGenerationContext();
+      const { currentRecipes: list, lastGenerationSnapshot: snap } = useRecipeStore.getState();
+      if (list.length > 0 && snap && !hasConditionsChanged(ctx)) {
+        setShowResults(true);
+      }
+    }, [buildGenerationContext]),
+  );
 
+  async function handleGenerate(force = false) {
+    const context = buildGenerationContext();
+    if (!force && currentRecipes.length > 0 && !hasConditionsChanged(context)) {
+      showToast('显示上次生成的菜谱');
+      userChoseFilterRef.current = false;
+      setShowResults(true);
+      return;
+    }
     try {
-      await generateAndSetRecipes({
-        availableIngredients: ingredients,
-        includedIngredientIds: included,
-        excludedIngredientIds: excluded,
-        selectedCuisines: cuisines,
-        selectedCookingMethods: methods,
-        selectedFlavors: tastes,
-        userPreference: userPreference ?? DEFAULT_PREFERENCE,
-        favoritedRecipes,
-        sortOrder,
-      });
+      await generateAndSetRecipes(context);
+      userChoseFilterRef.current = false;
       setShowResults(true);
     } catch (e: any) {
       showToast(e?.message ?? '生成失败，请检查网络后重试');
     }
+  }
+
+  async function handleForceRegenerate() {
+    await handleGenerate(true);
   }
 
   function handleToggleFavorite(id: string) {
@@ -320,11 +359,33 @@ export default function RecipesScreen() {
         <View style={styles.rrTopbar}>
           <View style={{ flex: 1 }}>
             <Text style={styles.rrTitle}>今天吃这个！</Text>
-            <Text style={styles.rrSub}>根据你的冰箱食材智能推荐</Text>
+            {lastGenerationSnapshot ? (
+              <Text style={styles.rrGenTime}>
+                {formatGenerationAgeLabel(lastGenerationSnapshot.createdAt)}
+              </Text>
+            ) : (
+              <Text style={styles.rrSub}>根据你的冰箱食材智能推荐</Text>
+            )}
           </View>
-          <TouchableOpacity onPress={() => setShowResults(false)} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>←</Text>
-          </TouchableOpacity>
+          <View style={styles.rrTopActions}>
+            <TouchableOpacity
+              onPress={() => void handleForceRegenerate()}
+              style={styles.refreshBtn}
+              disabled={isLoading}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="refresh" size={22} color={colors.g600} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                userChoseFilterRef.current = true;
+                setShowResults(false);
+              }}
+              style={styles.backBtn}
+            >
+              <Text style={styles.backBtnText}>←</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {currentRecipes.length === 0 ? (
@@ -347,7 +408,7 @@ export default function RecipesScreen() {
         <View style={styles.regenWrap}>
           <TouchableOpacity
             style={[styles.regenBtn, isLoading && { opacity: 0.5 }]}
-            onPress={handleGenerate}
+            onPress={() => void handleForceRegenerate()}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -413,7 +474,7 @@ export default function RecipesScreen() {
 
         <TouchableOpacity
           style={[styles.aiBtn, isLoading && { opacity: 0.6 }]}
-          onPress={handleGenerate}
+          onPress={() => void handleGenerate(false)}
           disabled={isLoading}
           activeOpacity={0.85}
         >
@@ -638,6 +699,22 @@ const styles = StyleSheet.create({
     color: colors.g600,
     fontFamily: font.family,
     marginTop: 2,
+  },
+  rrGenTime: {
+    fontSize: 12,
+    color: '#AAAAAA',
+    fontFamily: font.family,
+    marginTop: 4,
+  },
+  rrTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  refreshBtn: {
+    padding: 6,
+    borderRadius: 8,
   },
   backBtn: {
     padding: 4,

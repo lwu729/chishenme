@@ -5,6 +5,43 @@ import { getDatabase } from '../../db/database';
 
 const MAX_FAVORITED_RECIPES = 10;
 
+/** 某次成功生成菜谱时的条件快照（仅内存，不持久化） */
+export interface GenerationSnapshot {
+  createdAt: string; // ISO
+  ingredientIds: string[];
+  ingredientQuantities: Record<string, number>;
+  selectedCuisines: string[];
+  selectedCookingMethods: string[];
+  selectedFlavors: string[];
+  excludedIngredientIds: string[];
+  includedIngredientIds: string[];
+}
+
+function buildSnapshotFromContext(ctx: RecipeGenerationContext): GenerationSnapshot {
+  const ingredientIds = [...ctx.availableIngredients.map(i => i.id)].sort();
+  const ingredientQuantities: Record<string, number> = {};
+  ctx.availableIngredients.forEach(i => {
+    ingredientQuantities[i.id] = i.quantity;
+  });
+  return {
+    createdAt: new Date().toISOString(),
+    ingredientIds,
+    ingredientQuantities,
+    selectedCuisines: [...ctx.selectedCuisines].sort(),
+    selectedCookingMethods: [...ctx.selectedCookingMethods].sort(),
+    selectedFlavors: [...ctx.selectedFlavors].sort(),
+    excludedIngredientIds: [...ctx.excludedIngredientIds].sort(),
+    includedIngredientIds: [...ctx.includedIngredientIds].sort(),
+  };
+}
+
+function sortedStringArrayEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+}
+
 interface RecipeStore {
   currentRecipes: Recipe[];
   favoritedRecipes: Recipe[];
@@ -13,9 +50,11 @@ interface RecipeStore {
   selectedCuisines: string[];
   selectedCookingMethods: string[];
   selectedFlavors: string[];
+  lastGenerationSnapshot: GenerationSnapshot | null;
 
   loadFavoritedRecipes: () => void;
   generateAndSetRecipes: (context: RecipeGenerationContext) => Promise<void>;
+  invalidateCache: () => void;
   toggleFavorite: (id: string) => void;
   setSortOrder: (order: RecipeSortOrder) => void;
   setSelectedCuisines: (cuisines: string[]) => void;
@@ -31,6 +70,7 @@ export const useRecipeStore = create<RecipeStore>((set, get) => ({
   selectedCuisines: [],
   selectedCookingMethods: [],
   selectedFlavors: [],
+  lastGenerationSnapshot: null,
 
   loadFavoritedRecipes: () => {
     const db = getDatabase();
@@ -52,12 +92,18 @@ export const useRecipeStore = create<RecipeStore>((set, get) => ({
       const { favoritedRecipes } = get();
       const favNames = new Set(favoritedRecipes.map(r => r.name));
       const marked = recipes.map(r => ({ ...r, isFavorited: favNames.has(r.name) }));
-      set({ currentRecipes: marked, isLoading: false });
+      set({
+        currentRecipes: marked,
+        isLoading: false,
+        lastGenerationSnapshot: buildSnapshotFromContext(context),
+      });
     } catch (e) {
       set({ isLoading: false });
       throw e;
     }
   },
+
+  invalidateCache: () => set({ lastGenerationSnapshot: null }),
 
   toggleFavorite: (id) => {
     const { currentRecipes, favoritedRecipes } = get();
@@ -111,3 +157,30 @@ export const useRecipeStore = create<RecipeStore>((set, get) => ({
   setSelectedCookingMethods: (methods) => set({ selectedCookingMethods: methods }),
   setSelectedFlavors: (flavors) => set({ selectedFlavors: flavors }),
 }));
+
+/**
+ * 当前 context 是否与上次成功生成时的快照不同（需重新生成）。
+ * snapshot 为 null 视为从未生成过 → true。
+ */
+export function hasConditionsChanged(context: RecipeGenerationContext): boolean {
+  const snap = useRecipeStore.getState().lastGenerationSnapshot;
+  if (!snap) return true;
+
+  const currentIds = [...context.availableIngredients.map(i => i.id)].sort();
+  if (!sortedStringArrayEqual(snap.ingredientIds, currentIds)) return true;
+
+  for (const id of currentIds) {
+    const ing = context.availableIngredients.find(i => i.id === id);
+    if (!ing) return true;
+    const prevQ = snap.ingredientQuantities[id];
+    if (prevQ === undefined || prevQ !== ing.quantity) return true;
+  }
+
+  if (!sortedStringArrayEqual(snap.selectedCuisines, context.selectedCuisines)) return true;
+  if (!sortedStringArrayEqual(snap.selectedCookingMethods, context.selectedCookingMethods)) return true;
+  if (!sortedStringArrayEqual(snap.selectedFlavors, context.selectedFlavors)) return true;
+  if (!sortedStringArrayEqual(snap.excludedIngredientIds, context.excludedIngredientIds)) return true;
+  if (!sortedStringArrayEqual(snap.includedIngredientIds, context.includedIngredientIds)) return true;
+
+  return false;
+}

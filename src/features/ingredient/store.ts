@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Ingredient, StorageLocation, IngredientFilterState } from './types';
 import { getDatabase } from '../../db/database';
 import { calculateExpiryStatus, calculateDaysUntilExpiry } from '../../utils/expiryUtils';
+import { useRecipeStore } from '../recipe/store';
 
 const EXPIRY_SORT_ORDER: Record<string, number> = {
   expired: 0,
@@ -86,6 +87,7 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     );
 
     get().loadIngredients();
+    useRecipeStore.getState().invalidateCache();
   },
 
   updateIngredient: (id, updates) => {
@@ -103,12 +105,16 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     vals.push(id);
     db.runSync(`UPDATE ingredients SET ${sets.join(', ')} WHERE id = ?`, vals);
     get().loadIngredients();
+    if (updates.quantity !== undefined) {
+      useRecipeStore.getState().invalidateCache();
+    }
   },
 
   deleteIngredient: (id) => {
     const db = getDatabase();
     db.runSync('DELETE FROM ingredients WHERE id = ?', [id]);
     get().loadIngredients();
+    useRecipeStore.getState().invalidateCache();
   },
 
   setFilterState: (id, filterState) => {
