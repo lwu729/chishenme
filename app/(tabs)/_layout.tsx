@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors, font } from '../../src/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -22,6 +23,8 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -35,7 +38,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '主页',
+          title: t('tabs.home'),
           tabBarIcon: ({ focused }) => (
             <TabIcon name="home-outline" focused={focused} />
           ),
@@ -44,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="scan"
         options={{
-          title: '食材录入',
+          title: t('tabs.scan'),
           tabBarIcon: ({ focused }) => (
             <TabIcon name="camera-outline" focused={focused} />
           ),
@@ -53,7 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="fridge"
         options={{
-          title: '我的冰箱',
+          title: t('tabs.fridge'),
           tabBarIcon: ({ focused }) => (
             <TabIcon name="snow-outline" focused={focused} size={22} />
           ),
@@ -62,7 +65,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recipes"
         options={{
-          title: '我的菜谱',
+          title: t('tabs.recipes'),
           tabBarIcon: ({ focused }) => (
             <TabIcon name="book-outline" focused={focused} />
           ),

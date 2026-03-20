@@ -12,16 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
 import { useIngredientStore } from '../../src/features/ingredient/store';
 import { colors, font, radius } from '../../src/constants/theme';
 import CustomScrollView from '../../src/components/CustomScrollView';
 
-function showToast(msg: string) {
+function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
     ToastAndroid.show(msg, ToastAndroid.SHORT);
   } else {
-    Alert.alert('', msg, [{ text: '好的' }]);
+    Alert.alert('', msg, [{ text: okText }]);
   }
 }
 
@@ -44,26 +45,27 @@ function getEmoji(name: string): string {
   return FALLBACK_EMOJIS[Math.abs(h) % FALLBACK_EMOJIS.length];
 }
 
-function getBadge(status: ExpiryStatus) {
-  switch (status) {
-    case ExpiryStatus.EXPIRED:
-    case ExpiryStatus.URGENT:
-      return { bg: colors.redBg, text: colors.red, label: '即将过期' };
-    case ExpiryStatus.WARNING:
-      return { bg: colors.amberBg, text: '#C97A00', label: '快过期' };
-    default:
-      return { bg: colors.g50, text: colors.g600, label: '新鲜' };
-  }
-}
-
 function IngredientRow({ item }: { item: Ingredient }) {
-  const badge = getBadge(item.expiryStatus);
+  const { t } = useTranslation();
+
+  const badgeConfig = (() => {
+    switch (item.expiryStatus) {
+      case ExpiryStatus.EXPIRED:
+      case ExpiryStatus.URGENT:
+        return { bg: colors.redBg, text: colors.red, label: t('home.badgeUrgent') };
+      case ExpiryStatus.WARNING:
+        return { bg: colors.amberBg, text: '#C97A00', label: t('home.badgeWarning') };
+      default:
+        return { bg: colors.g50, text: colors.g600, label: t('home.badgeFresh') };
+    }
+  })();
+
   const expiryText =
     item.daysUntilExpiry < 0
-      ? '已过期'
+      ? t('home.expired')
       : item.daysUntilExpiry === 0
-      ? '已到期'
-      : `${item.daysUntilExpiry}天后过期`;
+      ? t('home.expiredToday')
+      : t('home.daysExpiry', { count: item.daysUntilExpiry });
 
   return (
     <View style={styles.foodRow}>
@@ -78,8 +80,8 @@ function IngredientRow({ item }: { item: Ingredient }) {
         <Text style={styles.foodName}>{item.name}</Text>
         <Text style={styles.foodExp}>{expiryText}</Text>
       </View>
-      <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-        <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
+      <View style={[styles.badge, { backgroundColor: badgeConfig.bg }]}>
+        <Text style={[styles.badgeText, { color: badgeConfig.text }]}>{badgeConfig.label}</Text>
       </View>
     </View>
   );
@@ -87,6 +89,7 @@ function IngredientRow({ item }: { item: Ingredient }) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { ingredients, loadIngredients } = useIngredientStore();
 
   useEffect(() => {
@@ -97,9 +100,9 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* 顶部栏 */}
       <View style={styles.topbar}>
-        <TouchableOpacity onPress={() => showToast('设置开发中')} style={styles.gearBtn}>
+        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.gearBtn}>
           <Text style={styles.gearIcon}>⚙️</Text>
-          <Text style={styles.gearLabel}>设置</Text>
+          <Text style={styles.gearLabel}>{t('home.settings')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -116,17 +119,17 @@ export default function HomeScreen() {
           </View>
           <View style={styles.bubble}>
             <View style={styles.bubbleArrow} />
-            <Text style={styles.bubbleText}>今天吃什么？</Text>
+            <Text style={styles.bubbleText}>{t('home.birdQuestion')}</Text>
           </View>
         </View>
-        <Text style={styles.birdLabel}>我的鸟窝</Text>
+        <Text style={styles.birdLabel}>{t('home.birdLabel')}</Text>
       </View>
 
       {/* 食材列表 */}
       <View style={styles.listContainer}>
         {ingredients.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>冰箱是空的，去添加食材吧 🛒</Text>
+            <Text style={styles.emptyText}>{t('home.emptyFridge')}</Text>
           </View>
         ) : (
           <CustomScrollView contentContainerStyle={styles.listContent}>
@@ -140,10 +143,10 @@ export default function HomeScreen() {
       {/* 底部按钮 */}
       <View style={styles.bottomBtns}>
         <TouchableOpacity style={styles.homeBtn} onPress={() => router.push('/(tabs)/scan')}>
-          <Text style={styles.homeBtnText}>前往AI扫描食材</Text>
+          <Text style={styles.homeBtnText}>{t('home.goScan')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.homeBtn} onPress={() => router.push('/(tabs)/recipes')}>
-          <Text style={styles.homeBtnText}>前往AI生成菜谱</Text>
+          <Text style={styles.homeBtnText}>{t('home.goRecipes')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

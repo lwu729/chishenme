@@ -12,16 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useRecipeStore } from '../src/features/recipe/store';
 import { useIngredientStore } from '../src/features/ingredient/store';
 import { colors, font, radius } from '../src/constants/theme';
 import { Recipe } from '../src/features/recipe/types';
 
-function showToast(msg: string) {
+function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
     ToastAndroid.show(msg, ToastAndroid.SHORT);
   } else {
-    Alert.alert('', msg, [{ text: '好的' }]);
+    Alert.alert('', msg, [{ text: okText }]);
   }
 }
 
@@ -67,16 +68,17 @@ function CompletionModal({
   recipeName: string;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <Text style={styles.modalEmoji}>🎉</Text>
-          <Text style={styles.modalTitle}>太棒了！</Text>
+          <Text style={styles.modalTitle}>{t('recipeDetail.completionTitle')}</Text>
           <Text style={styles.modalRecipeName}>{recipeName}</Text>
-          <Text style={styles.modalSub}>已完成烹饪</Text>
+          <Text style={styles.modalSub}>{t('recipeDetail.completionSub')}</Text>
           <TouchableOpacity style={styles.modalBtn} onPress={onDone} activeOpacity={0.85}>
-            <Text style={styles.modalBtnText}>完成！</Text>
+            <Text style={styles.modalBtnText}>{t('recipeDetail.completionBtn')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -86,6 +88,7 @@ function CompletionModal({
 
 // ─── 主页面 ───
 export default function RecipeDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentRecipes, favoritedRecipes, toggleFavorite } = useRecipeStore();
   const { ingredients, loadIngredients } = useIngredientStore();
@@ -105,9 +108,9 @@ export default function RecipeDetailScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>菜谱不存在</Text>
+          <Text style={styles.notFoundText}>{t('recipeDetail.notFound')}</Text>
           <TouchableOpacity style={styles.notFoundBtn} onPress={() => router.back()}>
-            <Text style={styles.notFoundBtnText}>← 返回</Text>
+            <Text style={styles.notFoundBtnText}>{t('recipeDetail.backBtn')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -120,7 +123,7 @@ export default function RecipeDetailScreen() {
     try {
       toggleFavorite(recipe!.id);
     } catch (e: any) {
-      showToast(e?.message ?? '收藏失败');
+      showToast(e?.message ?? t('recipeDetail.favoriteFailed'), t('common.ok'));
     }
   }
 
@@ -145,7 +148,7 @@ export default function RecipeDetailScreen() {
           {/* Badge 行 */}
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>⏱ {recipe.durationMinutes}分钟</Text>
+              <Text style={styles.badgeText}>⏱ {t('recipeDetail.durationLabel', { count: recipe.durationMinutes })}</Text>
             </View>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{recipe.cuisine}</Text>
@@ -161,7 +164,7 @@ export default function RecipeDetailScreen() {
           <View style={styles.divider} />
 
           {/* 使用食材 */}
-          <Text style={styles.sectionTitle}>使用食材</Text>
+          <Text style={styles.sectionTitle}>{t('recipeDetail.ingredientsTitle')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -190,7 +193,7 @@ export default function RecipeDetailScreen() {
           <View style={styles.divider} />
 
           {/* 步骤预览 */}
-          <Text style={styles.sectionTitle}>烹饪步骤</Text>
+          <Text style={styles.sectionTitle}>{t('recipeDetail.stepsTitle')}</Text>
           <View style={styles.stepsPreview}>
             {recipe.steps.map(step => (
               <View key={step.stepNumber} style={styles.stepPreviewRow}>
@@ -217,7 +220,7 @@ export default function RecipeDetailScreen() {
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>🍳 开始做饭</Text>
+            <Text style={styles.primaryBtnText}>{t('recipeDetail.startCooking')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -245,7 +248,7 @@ export default function RecipeDetailScreen() {
       {/* 进度指示 */}
       <View style={styles.progressWrap}>
         <Text style={styles.progressText}>
-          步骤 {currentStep + 1} / {totalSteps}
+          {t('recipeDetail.stepProgress', { current: currentStep + 1, total: totalSteps })}
         </Text>
         <View style={styles.progressTrack}>
           <View style={{ flex: currentStep + 1, height: 4, backgroundColor: colors.g600, borderRadius: 2 }} />
@@ -267,7 +270,7 @@ export default function RecipeDetailScreen() {
 
         {/* 时长提示 */}
         {step?.durationMinutes != null && (
-          <Text style={styles.stepDur}>约 {step.durationMinutes} 分钟</Text>
+          <Text style={styles.stepDur}>{t('recipeDetail.durationHint', { count: step.durationMinutes })}</Text>
         )}
 
         {/* 小鸟贴士 */}
@@ -277,7 +280,7 @@ export default function RecipeDetailScreen() {
           </View>
           <View style={styles.birdTriangle} />
           <View style={styles.birdBubble}>
-            <Text style={styles.birdBubbleText}>小贴士功能即将上线 🐦</Text>
+            <Text style={styles.birdBubbleText}>{t('recipeDetail.birdTip')}</Text>
           </View>
         </View>
       </ScrollView>
@@ -290,7 +293,7 @@ export default function RecipeDetailScreen() {
             onPress={() => setCurrentStep(s => s - 1)}
             activeOpacity={0.85}
           >
-            <Text style={[styles.primaryBtnText, styles.prevBtnText]}>← 返回上一步</Text>
+            <Text style={[styles.primaryBtnText, styles.prevBtnText]}>{t('recipeDetail.prevStep')}</Text>
           </TouchableOpacity>
         )}
         {isLast ? (
@@ -299,7 +302,7 @@ export default function RecipeDetailScreen() {
             onPress={() => setShowCompletion(true)}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>完成！🎉</Text>
+            <Text style={styles.primaryBtnText}>{t('recipeDetail.done')}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -307,7 +310,7 @@ export default function RecipeDetailScreen() {
             onPress={() => setCurrentStep(s => s + 1)}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>下一步 →</Text>
+            <Text style={styles.primaryBtnText}>{t('recipeDetail.nextStep')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -327,7 +330,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  // ── 找不到菜谱 ──
   notFound: {
     flex: 1,
     alignItems: 'center',
@@ -351,7 +353,6 @@ const styles = StyleSheet.create({
     fontFamily: font.family,
   },
 
-  // ── 顶部栏 ──
   topbar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,7 +395,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
-  // ── 详情页 ──
   scroll: {
     flex: 1,
   },
@@ -436,7 +436,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // 食材卡片横向滚动
   ingCards: {
     gap: 10,
     paddingBottom: 4,
@@ -482,7 +481,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // 步骤预览列表
   stepsPreview: {
     gap: 10,
   },
@@ -520,7 +518,6 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
 
-  // ── 底部固定栏 ──
   bottomBar: {
     paddingHorizontal: 24,
     paddingTop: 12,
@@ -554,7 +551,6 @@ const styles = StyleSheet.create({
     fontFamily: font.family,
   },
 
-  // ── 步骤做饭页 ──
   progressWrap: {
     paddingHorizontal: 24,
     paddingBottom: 12,
@@ -612,7 +608,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
 
-  // 小鸟区块
   birdRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -658,7 +653,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  // ── 完成弹窗 ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

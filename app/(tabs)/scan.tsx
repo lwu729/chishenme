@@ -21,15 +21,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useTranslation } from 'react-i18next';
 import { useIngredientStore, AddIngredientInput } from '../../src/features/ingredient/store';
 import { scanIngredient, ScannedIngredient } from '../../src/services/ai/ingredientScan';
 import { colors, font, radius } from '../../src/constants/theme';
 
-function showToast(msg: string) {
+function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
     ToastAndroid.show(msg, ToastAndroid.SHORT);
   } else {
-    Alert.alert('', msg, [{ text: '好的' }]);
+    Alert.alert('', msg, [{ text: okText }]);
   }
 }
 
@@ -74,6 +75,7 @@ function ConfirmModal({
   onSave: (input: AddIngredientInput & { imagePath: string; imageCrop?: { x: number; y: number; width: number; height: number } }) => void;
   onSkip: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(item.quantity);
   const [quantityText, setQuantityText] = useState(String(item.quantity));
@@ -136,8 +138,8 @@ function ConfirmModal({
   }
 
   function handleSave() {
-    if (!name.trim()) { showToast('请输入食材名称'); return; }
-    if (quantity <= 0) { showToast('数量不能为 0'); return; }
+    if (!name.trim()) { showToast(t('scan.pleaseInputName'), t('common.ok')); return; }
+    if (quantity <= 0) { showToast(t('scan.quantityNotZero'), t('common.ok')); return; }
     onSave({
       name: name.trim(),
       quantity,
@@ -191,9 +193,9 @@ function ConfirmModal({
         <View style={cStyles.sheet}>
           {/* 标题行 */}
           <View style={cStyles.sheetHeader}>
-            <Text style={cStyles.headerTitle}>确认食材 {index}/{total}</Text>
+            <Text style={cStyles.headerTitle}>{t('scan.confirmTitle', { current: index, total })}</Text>
             <TouchableOpacity onPress={onSkip} style={cStyles.skipBtn}>
-              <Text style={cStyles.skipBtnText}>跳过</Text>
+              <Text style={cStyles.skipBtnText}>{t('scan.skip')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -204,7 +206,7 @@ function ConfirmModal({
             showsVerticalScrollIndicator={false}
           >
             {/* 食材数量 */}
-            <Text style={cStyles.sectionTitle}>食材数量</Text>
+            <Text style={cStyles.sectionTitle}>{t('scan.quantitySection')}</Text>
             <View style={cStyles.sectionDivider} />
 
             <View style={cStyles.quantityRow}>
@@ -228,28 +230,28 @@ function ConfirmModal({
                 style={cStyles.unitInput}
                 value={unit}
                 onChangeText={setUnit}
-                placeholder="单位..."
+                placeholder={t('scan.unitPlaceholder')}
                 placeholderTextColor="#CCCCCC"
               />
             </View>
 
             {/* 食材信息 */}
-            <Text style={[cStyles.sectionTitle, { marginTop: 20 }]}>食材信息</Text>
+            <Text style={[cStyles.sectionTitle, { marginTop: 20 }]}>{t('scan.infoSection')}</Text>
             <View style={cStyles.sectionDivider} />
 
             <View style={cStyles.infoRow}>
-              <Text style={cStyles.infoLabel}>食材名称</Text>
+              <Text style={cStyles.infoLabel}>{t('scan.nameLabel')}</Text>
               <TextInput
                 style={cStyles.infoInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="输入食材名..."
+                placeholder={t('scan.namePlaceholder')}
                 placeholderTextColor="#CCCCCC"
               />
             </View>
 
             <View style={cStyles.infoRow}>
-              <Text style={cStyles.infoLabel}>到期日</Text>
+              <Text style={cStyles.infoLabel}>{t('scan.expiryLabel')}</Text>
               <DateTimePicker
                 value={expiryDate}
                 mode="date"
@@ -261,7 +263,7 @@ function ConfirmModal({
               />
             </View>
 
-            {/* 照片区域（有 boundingBox 时 zoom 到该食材） */}
+            {/* 照片区域 */}
             <View style={cStyles.photoPreview} onLayout={onPreviewLayout}>
               {cropStyle ? (
                 <Image
@@ -278,10 +280,10 @@ function ConfirmModal({
           {/* 底部按钮 */}
           <View style={cStyles.sheetFooter}>
             <TouchableOpacity style={cStyles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-              <Text style={cStyles.saveBtnText}>保存并继续</Text>
+              <Text style={cStyles.saveBtnText}>{t('scan.saveAndNext')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={cStyles.cancelBtn} onPress={onSkip} activeOpacity={0.85}>
-              <Text style={cStyles.cancelBtnText}>取消</Text>
+              <Text style={cStyles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -298,6 +300,7 @@ function ManualInputSheet({
   onClose: () => void;
   onSave: (input: AddIngredientInput) => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [quantityText, setQuantityText] = useState('1');
@@ -340,7 +343,7 @@ function ManualInputSheet({
 
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { showToast('需要相册权限才能选择图片'); return; }
+    if (status !== 'granted') { showToast(t('scan.needAlbum'), t('common.ok')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
       allowsEditing: true,
@@ -350,8 +353,8 @@ function ManualInputSheet({
   }
 
   function handleSave() {
-    if (!name.trim()) { showToast('请输入食材名称'); return; }
-    if (quantity <= 0) { showToast('数量不能为 0'); return; }
+    if (!name.trim()) { showToast(t('scan.pleaseInputName'), t('common.ok')); return; }
+    if (quantity <= 0) { showToast(t('scan.quantityNotZero'), t('common.ok')); return; }
     onSave({
       name: name.trim(),
       quantity,
@@ -377,7 +380,7 @@ function ManualInputSheet({
           </View>
 
           <View style={styles.sheetBody}>
-            <Text style={styles.sectionTitle}>食材数量</Text>
+            <Text style={styles.sectionTitle}>{t('scan.quantitySection')}</Text>
             <View style={styles.sectionDivider} />
 
             <View style={styles.quantityRow}>
@@ -401,27 +404,27 @@ function ManualInputSheet({
                 style={styles.unitInput}
                 value={unit}
                 onChangeText={setUnit}
-                placeholder="单位..."
+                placeholder={t('scan.unitPlaceholder')}
                 placeholderTextColor="#CCCCCC"
               />
             </View>
 
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>食材信息</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('scan.infoSection')}</Text>
             <View style={styles.sectionDivider} />
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>食材名称</Text>
+              <Text style={styles.infoLabel}>{t('scan.nameLabel')}</Text>
               <TextInput
                 style={styles.infoInput}
                 value={name}
                 onChangeText={setName}
-                placeholder="输入食材名..."
+                placeholder={t('scan.namePlaceholder')}
                 placeholderTextColor="#CCCCCC"
               />
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>到期日</Text>
+              <Text style={styles.infoLabel}>{t('scan.expiryLabel')}</Text>
               <DateTimePicker
                 value={expiryDate}
                 mode="date"
@@ -443,13 +446,13 @@ function ManualInputSheet({
                     resizeMode="cover"
                   />
                   <View style={styles.imgChangeOverlay}>
-                    <Text style={styles.imgChangeText}>更换图片</Text>
+                    <Text style={styles.imgChangeText}>{t('scan.changeImage')}</Text>
                   </View>
                 </>
               ) : (
                 <>
                   <Text style={styles.imgPlaceholderEmoji}>{getPlaceholderEmoji(name)}</Text>
-                  <Text style={styles.imgPlaceholderText}>点击上传图片</Text>
+                  <Text style={styles.imgPlaceholderText}>{t('scan.uploadImage')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -457,7 +460,7 @@ function ManualInputSheet({
 
           <View style={styles.sheetFooter}>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-              <Text style={styles.saveBtnText}>保存到我的冰箱</Text>
+              <Text style={styles.saveBtnText}>{t('scan.saveToFridge')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -468,6 +471,7 @@ function ManualInputSheet({
 
 // ─── 主屏幕 ───
 export default function ScanScreen() {
+  const { t } = useTranslation();
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const CARD_SWITCH_DURATION = 250;
   const [modalVisible, setModalVisible] = useState(false);
@@ -508,7 +512,7 @@ export default function ScanScreen() {
   async function handleScan() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      showToast('需要相机权限才能拍照');
+      showToast(t('scan.needCamera'), t('common.ok'));
       return;
     }
 
@@ -521,7 +525,7 @@ export default function ScanScreen() {
     if (result.canceled) return;
 
     const asset = result.assets[0];
-    if (!asset.base64) { showToast('无法读取图片数据'); return; }
+    if (!asset.base64) { showToast(t('scan.cannotRead'), t('common.ok')); return; }
 
     setPhotoUri(asset.uri);
     setScanning(true);
@@ -531,7 +535,7 @@ export default function ScanScreen() {
       const mediaType = asset.mimeType ?? 'image/jpeg';
       const items = await scanIngredient(asset.base64, mediaType);
       if (items.length === 0) {
-        showToast('未识别到食材，请重新拍照');
+        showToast(t('scan.noIngredient'), t('common.ok'));
         setScanning(false);
         return;
       }
@@ -540,7 +544,7 @@ export default function ScanScreen() {
       slideX.setValue(0);
     } catch (e) {
       console.error(e);
-      showToast('识别失败，请检查网络或重试');
+      showToast(t('scan.failed'), t('common.ok'));
     } finally {
       setScanning(false);
     }
@@ -552,7 +556,7 @@ export default function ScanScreen() {
     setSavedCount(c => c + 1);
     if (next >= scanQueue.length) {
       finishConfirmFlow();
-      showToast(`已保存 ${savedCount + 1} 个食材 ✓`);
+      showToast(t('scan.savedCount', { count: savedCount + 1 }), t('common.ok'));
     } else {
       animateToNext(next);
     }
@@ -562,7 +566,7 @@ export default function ScanScreen() {
     const next = currentIndex + 1;
     if (next >= scanQueue.length) {
       finishConfirmFlow();
-      if (savedCount > 0) showToast(`已保存 ${savedCount} 个食材 ✓`);
+      if (savedCount > 0) showToast(t('scan.savedCount', { count: savedCount }), t('common.ok'));
     } else {
       animateToNext(next);
     }
@@ -571,16 +575,16 @@ export default function ScanScreen() {
   function handleManualSave(input: AddIngredientInput) {
     addIngredient(input);
     setModalVisible(false);
-    showToast('食材已添加到冰箱 ✓');
+    showToast(t('scan.manualSaved'), t('common.ok'));
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* 顶部栏 */}
       <View style={styles.topbar}>
-        <Text style={styles.title}>食材录入</Text>
-        <TouchableOpacity onPress={() => showToast('扫描历史开发中')} style={styles.histBtn}>
-          <Text style={styles.histBtnText}>我的扫描历史</Text>
+        <Text style={styles.title}>{t('scan.title')}</Text>
+        <TouchableOpacity onPress={() => showToast(t('scan.historyComingSoon'), t('common.ok'))} style={styles.histBtn}>
+          <Text style={styles.histBtnText}>{t('scan.history')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -590,14 +594,14 @@ export default function ScanScreen() {
           {scanning ? (
             <>
               <ActivityIndicator size="large" color={colors.g600} />
-              <Text style={styles.scanHint}>AI 识别中...</Text>
+              <Text style={styles.scanHint}>{t('scan.scanning')}</Text>
             </>
           ) : (
             <>
               <View style={styles.scanIcon}>
                 <Text style={styles.scanIconEmoji}>📷</Text>
               </View>
-              <Text style={styles.scanHint}>{'对准食材或保质期标签拍照\nAI 自动识别食材和过期日'}</Text>
+              <Text style={styles.scanHint}>{t('scan.hint')}</Text>
             </>
           )}
         </View>
@@ -611,14 +615,14 @@ export default function ScanScreen() {
           onPress={handleScan}
           disabled={scanning}
         >
-          <Text style={styles.primaryBtnText}>点击开始扫描</Text>
+          <Text style={styles.primaryBtnText}>{t('scan.startScan')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryBtn}
           activeOpacity={0.85}
           onPress={() => setModalVisible(true)}
         >
-          <Text style={styles.secondaryBtnText}>手动输入食材</Text>
+          <Text style={styles.secondaryBtnText}>{t('scan.manualInput')}</Text>
         </TouchableOpacity>
       </View>
 

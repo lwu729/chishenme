@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors, font, radius } from '../../src/constants/theme';
 import CustomScrollView from '../../src/components/CustomScrollView';
 import { useIngredientStore } from '../../src/features/ingredient/store';
@@ -23,19 +24,22 @@ import { IngredientFilterState } from '../../src/features/ingredient/types';
 import { UserPreference } from '../../src/features/user/types';
 import type { RecipeGenerationContext } from '../../src/services/ai/recipeGenerate';
 
-function showToast(msg: string) {
+function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
     ToastAndroid.show(msg, ToastAndroid.SHORT);
   } else {
-    Alert.alert('', msg, [{ text: '好的' }]);
+    Alert.alert('', msg, [{ text: okText }]);
   }
 }
 
-function formatGenerationAgeLabel(createdAtIso: string): string {
+function formatGenerationAgeLabel(
+  createdAtIso: string,
+  t: (key: string, opts?: any) => string,
+): string {
   const ms = Date.now() - new Date(createdAtIso).getTime();
   const mins = Math.floor(ms / 60000);
-  if (mins < 1) return '根据刚刚的食材生成';
-  return `根据 ${mins} 分钟前的食材生成`;
+  if (mins < 1) return t('recipes.generationJustNow');
+  return t('recipes.generationAge', { minutes: mins });
 }
 
 const DEFAULT_PREFERENCE: UserPreference = {
@@ -43,6 +47,7 @@ const DEFAULT_PREFERENCE: UserPreference = {
   cookingTools: [],
   knives: [],
   assistiveTools: [],
+  measuringTools: [],
   condiments: [],
   preferredCuisines: [],
   preferredCookingMethods: [],
@@ -52,12 +57,12 @@ const DEFAULT_PREFERENCE: UserPreference = {
 
 // ─── 水平 tag 行（多选，空数组 = 全部） ───
 function TagRow({
-  allTag = '全部',
+  allTag,
   tags,
   selected,
   onToggle,
 }: {
-  allTag?: string;
+  allTag: string;
   tags: string[];
   selected: string[];
   onToggle: (tag: string) => void;
@@ -117,8 +122,9 @@ function TagRow({
   );
 }
 
-// ─── 食材标签格（包括 / 排除），从 store 读取真实食材 ───
+// ─── 食材标签格（包括 / 排除） ───
 function IngredientGrid({ mode }: { mode: 'include' | 'exclude' }) {
+  const { t } = useTranslation();
   const { ingredients, setFilterState } = useIngredientStore();
 
   function toggle(id: string, current: IngredientFilterState) {
@@ -141,11 +147,11 @@ function IngredientGrid({ mode }: { mode: 'include' | 'exclude' }) {
 
   return (
     <View style={styles.ieBox}>
-      <Text style={styles.ieTitle}>{mode === 'include' ? '包括食材' : '排除食材'}</Text>
+      <Text style={styles.ieTitle}>{mode === 'include' ? t('recipes.includeTitle') : t('recipes.excludeTitle')}</Text>
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={styles.ieGrid}>
           {ingredients.length === 0 ? (
-            <Text style={styles.ieEmpty}>暂无食材</Text>
+            <Text style={styles.ieEmpty}>{t('recipes.noIngredient')}</Text>
           ) : (
             ingredients.map(item => {
               const on =
@@ -204,6 +210,7 @@ function RecipeCard({
   index: number;
   onToggleFavorite: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const tags = [recipe.cuisine, recipe.flavor, recipe.cookingMethod];
   const ingredientNames = recipe.ingredients.map(i => i.name).join('、');
 
@@ -233,17 +240,17 @@ function RecipeCard({
           <Text style={styles.rname} numberOfLines={1}>
             {recipe.name}
           </Text>
-          <Text style={styles.rtime}>⏱ {recipe.durationMinutes}分钟</Text>
+          <Text style={styles.rtime}>⏱ {t('recipes.durationMin', { count: recipe.durationMinutes })}</Text>
         </View>
         <View style={styles.rtrow}>
-          {tags.map(t => (
-            <View key={t} style={styles.rtag}>
-              <Text style={styles.rtagText}>{t}</Text>
+          {tags.map(tag => (
+            <View key={tag} style={styles.rtag}>
+              <Text style={styles.rtagText}>{tag}</Text>
             </View>
           ))}
         </View>
         <Text style={styles.ringr} numberOfLines={2}>
-          使用食材：{ingredientNames}
+          {t('recipes.using')}{ingredientNames}
         </Text>
       </View>
     </TouchableOpacity>
@@ -252,16 +259,18 @@ function RecipeCard({
 
 // ─── 主屏幕 ───
 export default function RecipesScreen() {
+  const { t } = useTranslation();
   const [showResults, setShowResults] = useState(false);
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [methods, setMethods] = useState<string[]>([]);
   const [tastes, setTastes] = useState<string[]>([]);
 
+  const allTag = t('recipes.allTag');
+
   function toggleTag(
     tag: string,
     current: string[],
     setter: (v: string[]) => void,
-    allTag = '全部',
   ) {
     if (tag === allTag) {
       setter([]);
@@ -283,7 +292,6 @@ export default function RecipesScreen() {
   } = useRecipeStore();
   const { userPreference, loadUserPreference } = useUserStore();
 
-  /** 用户从结果页点「返回」后，切走再回 tab 时不自动回到结果页 */
   const userChoseFilterRef = useRef(false);
 
   const buildGenerationContext = useCallback((): RecipeGenerationContext => {
@@ -326,7 +334,7 @@ export default function RecipesScreen() {
   async function handleGenerate(force = false) {
     const context = buildGenerationContext();
     if (!force && currentRecipes.length > 0 && !hasConditionsChanged(context)) {
-      showToast('显示上次生成的菜谱');
+      showToast(t('recipes.showingCached'), t('common.ok'));
       userChoseFilterRef.current = false;
       setShowResults(true);
       return;
@@ -336,7 +344,7 @@ export default function RecipesScreen() {
       userChoseFilterRef.current = false;
       setShowResults(true);
     } catch (e: any) {
-      showToast(e?.message ?? '生成失败，请检查网络后重试');
+      showToast(e?.message ?? t('recipes.generateFailed'), t('common.ok'));
     }
   }
 
@@ -348,7 +356,7 @@ export default function RecipesScreen() {
     try {
       toggleFavorite(id);
     } catch (e: any) {
-      showToast(e?.message ?? '收藏失败');
+      showToast(e?.message ?? t('recipes.favoriteFailed'), t('common.ok'));
     }
   }
 
@@ -358,13 +366,13 @@ export default function RecipesScreen() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.rrTopbar}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rrTitle}>今天吃这个！</Text>
+            <Text style={styles.rrTitle}>{t('recipes.resultTitle')}</Text>
             {lastGenerationSnapshot ? (
               <Text style={styles.rrGenTime}>
-                {formatGenerationAgeLabel(lastGenerationSnapshot.createdAt)}
+                {formatGenerationAgeLabel(lastGenerationSnapshot.createdAt, t)}
               </Text>
             ) : (
-              <Text style={styles.rrSub}>根据你的冰箱食材智能推荐</Text>
+              <Text style={styles.rrSub}>{t('recipes.resultSub')}</Text>
             )}
           </View>
           <View style={styles.rrTopActions}>
@@ -390,7 +398,7 @@ export default function RecipesScreen() {
 
         {currentRecipes.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>暂无菜谱，请返回重新生成</Text>
+            <Text style={styles.emptyText}>{t('recipes.empty')}</Text>
           </View>
         ) : (
           <CustomScrollView contentContainerStyle={styles.rrList}>
@@ -414,7 +422,7 @@ export default function RecipesScreen() {
             {isLoading ? (
               <ActivityIndicator color={colors.g800} />
             ) : (
-              <Text style={styles.regenBtnText}>重新生成</Text>
+              <Text style={styles.regenBtnText}>{t('recipes.regenerate')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -427,18 +435,19 @@ export default function RecipesScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.rfTopbar}>
         <View>
-          <Text style={styles.rfTitle}>今天吃什么？</Text>
-          <Text style={styles.rfSub}>根据你的冰箱食材智能推荐</Text>
+          <Text style={styles.rfTitle}>{t('recipes.filterTitle')}</Text>
+          <Text style={styles.rfSub}>{t('recipes.filterSub')}</Text>
         </View>
-        <TouchableOpacity style={styles.kitBtn} onPress={() => showToast('厨具设定开发中')}>
-          <Text style={styles.kitBtnText}>🍳 厨具设定</Text>
+        <TouchableOpacity style={styles.kitBtn} onPress={() => showToast(t('recipes.kitchenwareComingSoon'), t('common.ok'))}>
+          <Text style={styles.kitBtnText}>{t('recipes.kitchenware')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.rfBody}>
         <View style={styles.rfSec}>
-          <Text style={styles.flabel}>选择菜系</Text>
+          <Text style={styles.flabel}>{t('recipes.cuisineLabel')}</Text>
           <TagRow
+            allTag={allTag}
             tags={['常吃', '家常', '日式', '川菜', '粤菜']}
             selected={cuisines}
             onToggle={tag => toggleTag(tag, cuisines, setCuisines)}
@@ -446,8 +455,9 @@ export default function RecipesScreen() {
         </View>
 
         <View style={styles.rfSec}>
-          <Text style={styles.flabel}>选择烹饪方式</Text>
+          <Text style={styles.flabel}>{t('recipes.methodLabel')}</Text>
           <TagRow
+            allTag={allTag}
             tags={['电饭煲', '炒菜', '炖煮', '微波炉', '水煮']}
             selected={methods}
             onToggle={tag => toggleTag(tag, methods, setMethods)}
@@ -455,8 +465,9 @@ export default function RecipesScreen() {
         </View>
 
         <View style={styles.rfSec}>
-          <Text style={styles.flabel}>选择口味</Text>
+          <Text style={styles.flabel}>{t('recipes.flavorLabel')}</Text>
           <TagRow
+            allTag={allTag}
             tags={['清淡', '偏辣', '酸甜', '咸鲜']}
             selected={tastes}
             onToggle={tag => toggleTag(tag, tastes, setTastes)}
@@ -468,8 +479,8 @@ export default function RecipesScreen() {
           <IngredientGrid mode="exclude" />
         </View>
 
-        <TouchableOpacity style={styles.randBtn} onPress={() => showToast('随机选好啦！🎲')}>
-          <Text style={styles.randBtnText}>随机选择所有条件</Text>
+        <TouchableOpacity style={styles.randBtn} onPress={() => showToast(t('recipes.randomDone'), t('common.ok'))}>
+          <Text style={styles.randBtnText}>{t('recipes.random')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -481,10 +492,10 @@ export default function RecipesScreen() {
           {isLoading ? (
             <View style={styles.aiBtnLoading}>
               <ActivityIndicator color="#FFFFFF" size="small" />
-              <Text style={styles.aiBtnText}>生成中...</Text>
+              <Text style={styles.aiBtnText}>{t('recipes.generating')}</Text>
             </View>
           ) : (
-            <Text style={styles.aiBtnText}>AI生成今日食谱</Text>
+            <Text style={styles.aiBtnText}>{t('recipes.generate')}</Text>
           )}
         </TouchableOpacity>
       </View>

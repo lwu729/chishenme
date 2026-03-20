@@ -15,22 +15,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
 import { useIngredientStore } from '../../src/features/ingredient/store';
 import { colors, font, radius } from '../../src/constants/theme';
 import CustomScrollView from '../../src/components/CustomScrollView';
 
-function showToast(msg: string) {
+function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
     ToastAndroid.show(msg, ToastAndroid.SHORT);
   } else {
-    Alert.alert('', msg, [{ text: '好的' }]);
+    Alert.alert('', msg, [{ text: okText }]);
   }
 }
 
 type PillType = 'urgent' | 'warning' | 'fresh' | null;
 
-// 根据食材名推导展示用 emoji（与 index.tsx 共用相同映射）
 const EMOJI_MAP: Record<string, string> = {
   菠菜: '🥬', 豆腐: '🫘', 番茄: '🍅', 鸡蛋: '🥚', 香菇: '🍄',
   鸡胸肉: '🍗', 鸡肉: '🍗', 大蒜: '🧄', 姜: '🌿', 猪肉: '🥩', 牛肉: '🥩',
@@ -89,6 +89,7 @@ function EditModal({
   onClose: () => void;
   onSave: (id: string, quantity: number, remainingPercentage: number, imagePath: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const max = item.originalQuantity;
   const [quantity, setQuantity] = useState(item.quantity);
   const [quantityText, setQuantityText] = useState(String(item.quantity));
@@ -127,13 +128,13 @@ function EditModal({
     } else if (parsed > max) {
       setQuantity(max);
       setQuantityText(String(max));
-      showToast(`数量不可超过原始录入量 ${max}${item.unit}`);
+      showToast(t('fridge.quantityLimit', { max, unit: item.unit }), t('common.ok'));
     }
   }
 
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { showToast('需要相册权限才能选择图片'); return; }
+    if (status !== 'granted') { showToast(t('fridge.needAlbum'), t('common.ok')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
       allowsEditing: true,
@@ -143,7 +144,7 @@ function EditModal({
   }
 
   function handleSave() {
-    if (quantity <= 0) { showToast('数量不能为 0'); return; }
+    if (quantity <= 0) { showToast(t('fridge.quantityNotZero'), t('common.ok')); return; }
     const remaining = Math.round((quantity / max) * 100);
     onSave(item.id, quantity, remaining, imageUri);
   }
@@ -168,7 +169,7 @@ function EditModal({
 
           <View style={editStyles.sheetBody}>
             {/* 食材数量 */}
-            <Text style={editStyles.sectionTitle}>食材数量</Text>
+            <Text style={editStyles.sectionTitle}>{t('fridge.quantitySection')}</Text>
             <View style={editStyles.sectionDivider} />
 
             <View style={editStyles.quantityRow}>
@@ -199,16 +200,16 @@ function EditModal({
             </View>
 
             {/* 食材信息 */}
-            <Text style={[editStyles.sectionTitle, { marginTop: 24 }]}>食材信息</Text>
+            <Text style={[editStyles.sectionTitle, { marginTop: 24 }]}>{t('fridge.infoSection')}</Text>
             <View style={editStyles.sectionDivider} />
 
             <View style={editStyles.infoRow}>
-              <Text style={editStyles.infoLabel}>食材名称</Text>
+              <Text style={editStyles.infoLabel}>{t('fridge.nameLabel')}</Text>
               <Text style={editStyles.infoDisabledText}>{item.name}</Text>
             </View>
 
             <View style={editStyles.infoRow}>
-              <Text style={editStyles.infoLabel}>到期日</Text>
+              <Text style={editStyles.infoLabel}>{t('fridge.expiryLabel')}</Text>
               <Text style={editStyles.infoDisabledText}>{item.expiryDate}</Text>
             </View>
 
@@ -222,13 +223,13 @@ function EditModal({
                     resizeMode="cover"
                   />
                   <View style={editStyles.imgChangeOverlay}>
-                    <Text style={editStyles.imgChangeText}>更换图片</Text>
+                    <Text style={editStyles.imgChangeText}>{t('fridge.changeImage')}</Text>
                   </View>
                 </>
               ) : (
                 <>
                   <Text style={editStyles.imgPlaceholderEmoji}>{getPlaceholderEmoji(item.name)}</Text>
-                  <Text style={editStyles.imgPlaceholderText}>点击上传图片</Text>
+                  <Text style={editStyles.imgPlaceholderText}>{t('fridge.uploadImage')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -237,10 +238,10 @@ function EditModal({
           {/* 按钮 */}
           <View style={editStyles.sheetFooter}>
             <TouchableOpacity style={editStyles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-              <Text style={editStyles.saveBtnText}>保存</Text>
+              <Text style={editStyles.saveBtnText}>{t('fridge.save')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={editStyles.cancelBtn} onPress={onClose} activeOpacity={0.85}>
-              <Text style={editStyles.cancelBtnText}>取消</Text>
+              <Text style={editStyles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -301,13 +302,14 @@ function FridgeCard({
   onDelete: (id: string, name: string) => void;
   onEdit: (item: Ingredient) => void;
 }) {
+  const { t } = useTranslation();
   const badge = getBadge(item.expiryStatus);
   const expiryText =
     item.daysUntilExpiry < 0
-      ? '已过期'
+      ? t('fridge.expired')
       : item.daysUntilExpiry === 0
-      ? '已到期'
-      : `还有${item.daysUntilExpiry}天到期`;
+      ? t('fridge.expiredToday')
+      : t('fridge.daysLeft', { count: item.daysUntilExpiry });
 
   return (
     <View style={styles.fcard}>
@@ -336,20 +338,19 @@ function FridgeCard({
         <View>
           <Text style={styles.fname}>{item.name}</Text>
           <Text style={styles.fused}>
-            {item.quantity}
-            {item.unit} · 剩余{item.remainingPercentage}%
+            {item.quantity}{item.unit} · {t('fridge.remaining', { percent: item.remainingPercentage })}
           </Text>
         </View>
         <View style={[styles.ebadge, { backgroundColor: badge.bg }]}>
           <Text style={[styles.ebadgeText, { color: badge.text }]}>● {expiryText}</Text>
         </View>
       </View>
-
     </View>
   );
 }
 
 export default function FridgeScreen() {
+  const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
   const [activePill, setActivePill] = useState<PillType>(null);
   const [editingItem, setEditingItem] = useState<Ingredient | null>(null);
@@ -359,12 +360,10 @@ export default function FridgeScreen() {
     loadIngredients();
   }, []);
 
-  // 计算各类别数量
   const urgentCount = ingredients.filter(i => getItemPill(i) === 'urgent').length;
   const warningCount = ingredients.filter(i => getItemPill(i) === 'warning').length;
   const freshCount = ingredients.filter(i => getItemPill(i) === 'fresh').length;
 
-  // 先搜索，再按 pill 筛选
   const displayItems = ingredients
     .filter(item => (searchText ? item.name.includes(searchText) : true))
     .filter(item => (activePill ? getItemPill(item) === activePill : true));
@@ -380,12 +379,12 @@ export default function FridgeScreen() {
 
   function handleDelete(id: string, name: string) {
     Alert.alert(
-      '确认删除',
-      `确定要删除「${name}」吗？`,
+      t('fridge.deleteTitle'),
+      t('fridge.deleteBody', { name }),
       [
-        { text: '取消', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '删除',
+          text: t('fridge.deleteConfirm'),
           style: 'destructive',
           onPress: () => deleteIngredient(id),
         },
@@ -400,7 +399,7 @@ export default function FridgeScreen() {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="搜索食材..."
+          placeholder={t('fridge.searchPlaceholder')}
           placeholderTextColor="#CCCCCC"
           value={searchText}
           onChangeText={setSearchText}
@@ -414,21 +413,21 @@ export default function FridgeScreen() {
           onPress={() => togglePill('urgent')}
         >
           <View style={[styles.dot, { backgroundColor: colors.red }]} />
-          <Text style={[styles.pillText, { color: colors.red }]}>即将过期 {urgentCount}</Text>
+          <Text style={[styles.pillText, { color: colors.red }]}>{t('fridge.pillUrgent')} {urgentCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.pill, styles.pillAmber, activePill === 'warning' && styles.pillBorderAmber]}
           onPress={() => togglePill('warning')}
         >
           <View style={[styles.dot, { backgroundColor: colors.amber }]} />
-          <Text style={[styles.pillText, { color: '#C97A00' }]}>快要过期 {warningCount}</Text>
+          <Text style={[styles.pillText, { color: '#C97A00' }]}>{t('fridge.pillWarning')} {warningCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.pill, styles.pillGreen, activePill === 'fresh' && styles.pillBorderGreen]}
           onPress={() => togglePill('fresh')}
         >
           <View style={[styles.dot, { backgroundColor: colors.g400 }]} />
-          <Text style={[styles.pillText, { color: colors.g600 }]}>新鲜 {freshCount}</Text>
+          <Text style={[styles.pillText, { color: colors.g600 }]}>{t('fridge.pillFresh')} {freshCount}</Text>
         </TouchableOpacity>
       </View>
 
@@ -440,7 +439,7 @@ export default function FridgeScreen() {
         {displayItems.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              {ingredients.length === 0 ? '冰箱是空的，去添加食材吧 🛒' : '没有符合条件的食材'}
+              {ingredients.length === 0 ? t('fridge.emptyFridge') : t('fridge.noMatch')}
             </Text>
           </View>
         )}
@@ -710,11 +709,6 @@ const editStyles = StyleSheet.create({
     fontSize: 14,
     fontFamily: font.family,
     color: '#AAAAAA',
-  },
-  infoValueText: {
-    fontSize: 15,
-    fontFamily: font.family,
-    color: colors.g800,
   },
   infoDisabledText: {
     flex: 1,
