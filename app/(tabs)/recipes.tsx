@@ -15,6 +15,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { colors, font, radius } from '../../src/constants/theme';
+import i18n from '../../src/i18n';
 import CustomScrollView from '../../src/components/CustomScrollView';
 import { useIngredientStore } from '../../src/features/ingredient/store';
 import { useRecipeStore, hasConditionsChanged } from '../../src/features/recipe/store';
@@ -266,6 +267,20 @@ export default function RecipesScreen() {
   const [tastes, setTastes] = useState<string[]>([]);
 
   const allTag = t('recipes.allTag');
+  const cuisineOptions = t('recipes.cuisineOptions', { returnObjects: true }) as string[];
+  const methodOptions = t('recipes.methodOptions', { returnObjects: true }) as string[];
+  const flavorOptions = t('recipes.flavorOptions', { returnObjects: true }) as string[];
+
+  // 切换语言后清空选中，因为选项内容已完全改变
+  useEffect(() => {
+    function resetFilters() {
+      setCuisines([]);
+      setMethods([]);
+      setTastes([]);
+    }
+    i18n.on('languageChanged', resetFilters);
+    return () => { i18n.off('languageChanged', resetFilters); };
+  }, []);
 
   function toggleTag(
     tag: string,
@@ -448,7 +463,7 @@ export default function RecipesScreen() {
           <Text style={styles.flabel}>{t('recipes.cuisineLabel')}</Text>
           <TagRow
             allTag={allTag}
-            tags={['常吃', '家常', '日式', '川菜', '粤菜']}
+            tags={cuisineOptions}
             selected={cuisines}
             onToggle={tag => toggleTag(tag, cuisines, setCuisines)}
           />
@@ -458,7 +473,7 @@ export default function RecipesScreen() {
           <Text style={styles.flabel}>{t('recipes.methodLabel')}</Text>
           <TagRow
             allTag={allTag}
-            tags={['电饭煲', '炒菜', '炖煮', '微波炉', '水煮']}
+            tags={methodOptions}
             selected={methods}
             onToggle={tag => toggleTag(tag, methods, setMethods)}
           />
@@ -468,7 +483,7 @@ export default function RecipesScreen() {
           <Text style={styles.flabel}>{t('recipes.flavorLabel')}</Text>
           <TagRow
             allTag={allTag}
-            tags={['清淡', '偏辣', '酸甜', '咸鲜']}
+            tags={flavorOptions}
             selected={tastes}
             onToggle={tag => toggleTag(tag, tastes, setTastes)}
           />
