@@ -2,6 +2,7 @@ import { Ingredient } from '../../features/ingredient/types';
 import { Recipe, RecipeSortOrder, RecipeStep } from '../../features/recipe/types';
 import { UserPreference } from '../../features/user/types';
 import { callClaude } from './claudeClient';
+import i18n from '../../i18n';
 
 export interface RecipeGenerationContext {
   availableIngredients: Ingredient[]; // 当前冰箱所有食材
@@ -54,7 +55,8 @@ export async function generateRecipes(context: RecipeGenerationContext): Promise
   const measuringToolsStr = context.userPreference.measuringTools?.length > 0
     ? context.userPreference.measuringTools.join('、')
     : '无';
-  const prompt = buildPrompt(context);
+  const language = (i18n.language === 'en' ? 'en' : 'zh') as 'zh' | 'en';
+  const prompt = buildPrompt(context, language);
   const raw = await callClaude(prompt, buildSystemPrompt(measuringToolsStr));
 
   // 去掉可能的 markdown 代码块标记
@@ -94,7 +96,7 @@ export async function generateRecipes(context: RecipeGenerationContext): Promise
   });
 }
 
-function buildPrompt(ctx: RecipeGenerationContext): string {
+function buildPrompt(ctx: RecipeGenerationContext, language: 'zh' | 'en'): string {
   const lines: string[] = [];
   const excludedSet = new Set(ctx.excludedIngredientIds);
   const includedSet = new Set(ctx.includedIngredientIds);
@@ -157,6 +159,17 @@ function buildPrompt(ctx: RecipeGenerationContext): string {
     });
   }
 
-  lines.push('\n请生成恰好 5 个适合的菜谱，用中文，步骤详细，食材用量具体。');
+  if (language === 'en') {
+    lines.push('\nGenerate exactly 5 recipes. Steps should be detailed and ingredient quantities specific.');
+    lines.push(`
+IMPORTANT LANGUAGE INSTRUCTIONS:
+1. All ingredient names in the list above may be in Chinese. Before generating recipes, mentally translate all ingredient names to English.
+2. Generate ALL output in English: recipe names, cuisine types, cooking methods, flavors, ingredient names, units, and every step description must be in English.
+3. Use natural English cooking terminology (e.g. "stir-fry", "simmer", "season to taste").
+4. Recipe names should be natural English dish names, not literal translations.`);
+  } else {
+    lines.push('\n请生成恰好 5 个适合的菜谱，步骤详细，食材用量具体。');
+  }
+
   return lines.join('\n');
 }
