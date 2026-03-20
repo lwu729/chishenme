@@ -16,6 +16,7 @@ export interface AddIngredientInput {
   unit: string;
   expiryDate: string; // 'YYYY-MM-DD'
   imagePath?: string; // 本地图片 URI（可选）
+  imageCrop?: { x: number; y: number; width: number; height: number }; // boundingBox（可选）
 }
 
 interface IngredientStore {
@@ -36,12 +37,14 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
 
   loadIngredients: () => {
     const db = getDatabase();
-    const rows = db.getAllSync<Ingredient>('SELECT * FROM ingredients');
+    const rows = db.getAllSync<Ingredient & { imageCrop: string | null }>('SELECT * FROM ingredients');
 
     const ingredients = rows.map(row => {
       const days = calculateDaysUntilExpiry(row.expiryDate);
       const status = calculateExpiryStatus(days, row.remainingPercentage);
-      return { ...row, daysUntilExpiry: days, expiryStatus: status };
+      let imageCrop: Ingredient['imageCrop'] = null;
+      try { if (row.imageCrop) imageCrop = JSON.parse(row.imageCrop); } catch (_) {}
+      return { ...row, daysUntilExpiry: days, expiryStatus: status, imageCrop };
     });
 
     ingredients.sort((a, b) => {
@@ -62,8 +65,8 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     db.runSync(
       `INSERT INTO ingredients
          (id, name, quantity, unit, expiryDate, loggedDate, daysUntilExpiry,
-          imagePath, remainingPercentage, originalQuantity, storageLocation, expiryStatus, filterState)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          imagePath, imageCrop, remainingPercentage, originalQuantity, storageLocation, expiryStatus, filterState)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.name,
@@ -73,6 +76,7 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
         today,
         days,
         input.imagePath ?? null,
+        input.imageCrop ? JSON.stringify(input.imageCrop) : null,
         100,
         input.quantity,
         StorageLocation.ROOM_TEMP,

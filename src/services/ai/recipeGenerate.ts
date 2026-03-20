@@ -1,6 +1,7 @@
 import { Ingredient } from '../../features/ingredient/types';
 import { Recipe, RecipeSortOrder, RecipeStep } from '../../features/recipe/types';
 import { UserPreference } from '../../features/user/types';
+import { callClaude } from './claudeClient';
 
 export interface RecipeGenerationContext {
   availableIngredients: Ingredient[]; // 当前冰箱所有食材
@@ -16,19 +17,138 @@ export interface RecipeGenerationContext {
   relatedRecipeStep?: RecipeStep; // 做饭提示时传入当前步骤
 }
 
+const SYSTEM_PROMPT = `你是一个中文菜谱生成助手。根据用户提供的冰箱食材和条件，生成适合的菜谱。
+严格只返回 JSON，不要任何额外文字或 markdown 代码块，格式如下：
+{
+  "recipes": [
+    {
+      "name": "菜名",
+      "cuisine": "菜系",
+      "cookingMethod": "烹饪方式",
+      "flavor": "口味",
+      "durationMinutes": 30,
+      "ingredients": [
+        { "name": "食材名", "quantity": 200, "unit": "克" }
+      ],
+      "steps": [
+        { "stepNumber": 1, "instruction": "步骤说明", "durationMinutes": 5 }
+      ]
+    }
+  ]
+}
+注意：
+- 生成恰好 5 个菜谱
+- 食材用量要具体，单位使用克/毫升/个/把等常见单位
+- 步骤清晰，每步骤有具体操作说明
+- 严格输出 JSON，不要任何前缀或后缀文字`;
+
 /**
  * 根据当前冰箱食材和用户偏好，生成菜谱列表。
- * @param context - 包含食材、偏好、过滤条件等完整上下文
  */
 export async function generateRecipes(context: RecipeGenerationContext): Promise<Recipe[]> {
-  // TODO: 实现菜谱生成
-  // - 根据 context 构建详细的菜谱生成 prompt
-  //   · 优先使用 includedIngredientIds 对应的食材
-  //   · 排除 excludedIngredientIds 对应的食材
-  //   · 按 sortOrder 排序提示 AI 生成顺序
-  //   · 参考 favoritedRecipes 推断用户口味偏好
-  //   · 结合 userPreference 中的烹饪工具、调料等约束
-  // - 调用 callClaude，要求返回 JSON 格式的 Recipe[]
-  // - 解析并校验返回结果
-  throw new Error('TODO: generateRecipes not implemented');
+  const prompt = buildPrompt(context);
+  const raw = await callClaude(prompt, SYSTEM_PROMPT);
+
+  // 去掉可能的 markdown 代码块标记
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+
+  let parsed: { recipes: any[] };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error('菜谱生成失败，请重试');
+  }
+
+  if (!parsed?.recipes || !Array.isArray(parsed.recipes)) {
+    throw new Error('菜谱生成失败，请重试');
+  }
+
+  const today = new Date().toISOString();
+
+  return parsed.recipes.map((r: any) => {
+    const steps: RecipeStep[] = Array.isArray(r.steps) ? r.steps : [];
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: r.name ?? '未知菜谱',
+      cuisine: r.cuisine ?? '家常',
+      cookingMethod: r.cookingMethod ?? '炒菜',
+      flavor: r.flavor ?? '清淡',
+      durationMinutes: typeof r.durationMinutes === 'number' ? r.durationMinutes : 30,
+      ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+      steps,
+      totalSteps: steps.length,
+      isFavorited: false,
+      createdAt: today,
+    };
+  });
+}
+
+function buildPrompt(ctx: RecipeGenerationContext): string {
+  const lines: string[] = [];
+  const excludedSet = new Set(ctx.excludedIngredientIds);
+  const includedSet = new Set(ctx.includedIngredientIds);
+
+  const available = ctx.availableIngredients.filter(i => !excludedSet.has(i.id));
+  lines.push('【冰箱食材】');
+  if (available.length === 0) {
+    lines.push('（冰箱暂无食材，请根据常见家常食材生成菜谱）');
+  } else {
+    for (const ing of available) {
+      const priority = includedSet.has(ing.id) ? '【优先使用】' : '';
+      const expiryText =
+        ing.daysUntilExpiry <= 0
+          ? '已过期'
+          : `${ing.daysUntilExpiry}天后到期`;
+      lines.push(`- ${ing.name} ${ing.quantity}${ing.unit}（${expiryText}）${priority}`);
+    }
+  }
+
+  lines.push('\n【生成偏好】');
+  const sortHint: Record<RecipeSortOrder, string> = {
+    [RecipeSortOrder.MOST_URGENT]: '优先消耗即将过期的食材',
+    [RecipeSortOrder.FAVORITED_FIRST]: '参考用户收藏菜谱的风格和口味',
+    [RecipeSortOrder.ALL_TAGS_MATCH]: '尽量同时满足所有筛选条件',
+    [RecipeSortOrder.SHORTEST_TIME]: '烹饪总时间越短越好',
+    [RecipeSortOrder.FEWEST_STEPS]: '烹饪步骤越少越好',
+  };
+  lines.push(sortHint[ctx.sortOrder]);
+
+  const hasFilters =
+    ctx.selectedCuisines.length ||
+    ctx.selectedCookingMethods.length ||
+    ctx.selectedFlavors.length;
+  if (hasFilters) {
+    lines.push('\n【用户筛选条件（每组条件满足其中一个即可）】');
+    if (ctx.selectedCuisines.length) lines.push(`- 菜系（任选其一）：${ctx.selectedCuisines.join('、')}`);
+    if (ctx.selectedCookingMethods.length) lines.push(`- 烹饪方式（任选其一）：${ctx.selectedCookingMethods.join('、')}`);
+    if (ctx.selectedFlavors.length) lines.push(`- 口味（任选其一）：${ctx.selectedFlavors.join('、')}`);
+  }
+
+  const pref = ctx.userPreference;
+  const prefLines: string[] = [];
+  if (pref.cookingTools?.length) prefLines.push(`- 可用烹饪工具：${pref.cookingTools.join('、')}`);
+  if (pref.condiments?.length) prefLines.push(`- 可用调料：${pref.condiments.join('、')}`);
+  if (pref.preferredCuisines?.length && !ctx.selectedCuisines.length)
+    prefLines.push(`- 偏好菜系：${pref.preferredCuisines.join('、')}`);
+  if (pref.preferredCookingMethods?.length && !ctx.selectedCookingMethods.length)
+    prefLines.push(`- 偏好烹饪方式：${pref.preferredCookingMethods.join('、')}`);
+  if (pref.preferredFlavors?.length && !ctx.selectedFlavors.length)
+    prefLines.push(`- 偏好口味：${pref.preferredFlavors.join('、')}`);
+  if (prefLines.length) {
+    lines.push('\n【用户偏好】');
+    lines.push(...prefLines);
+  }
+
+  if (ctx.favoritedRecipes.length) {
+    lines.push('\n【用户收藏菜谱（参考口味偏好）】');
+    ctx.favoritedRecipes.slice(0, 5).forEach(r => {
+      lines.push(`- ${r.name}（${r.cuisine}・${r.flavor}・${r.cookingMethod}）`);
+    });
+  }
+
+  lines.push('\n请生成恰好 5 个适合的菜谱，用中文，步骤详细，食材用量具体。');
+  return lines.join('\n');
 }

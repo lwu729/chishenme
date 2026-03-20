@@ -29,6 +29,7 @@ export interface Ingredient {
   loggedDate: string; // ISO date string，录入日
   daysUntilExpiry: number; // 计算得出：expiryDate - today
   imagePath: string | null;
+  imageCrop: { x: number; y: number; width: number; height: number } | null;
   remainingPercentage: number; // 还需要消耗的百分比（100 = 全新，0 = 用完）
   originalQuantity: number; // 录入时的原始数量，用于计算 remainingPercentage 上限
   storageLocation: StorageLocation;

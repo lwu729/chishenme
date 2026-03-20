@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Image,
+  LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -248,6 +249,49 @@ function EditModal({
   );
 }
 
+type BoundingBox = { x: number; y: number; width: number; height: number };
+
+function CroppedIngredientImage({ uri, crop }: { uri: string; crop: BoundingBox | null }) {
+  const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    Image.getSize(uri, (w, h) => setImgSize({ width: w, height: h }), () => {});
+  }, [uri]);
+
+  function onLayout(e: LayoutChangeEvent) {
+    const { width, height } = e.nativeEvent.layout;
+    setContainerSize({ width, height });
+  }
+
+  const cropStyle = useMemo(() => {
+    if (!crop || !imgSize || containerSize.width <= 0 || containerSize.height <= 0) return null;
+    const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+    const x = clamp01(crop.x);
+    const y = clamp01(crop.y);
+    const w = Math.max(0.05, clamp01(crop.width));
+    const h = Math.max(0.05, clamp01(crop.height));
+    const scale = Math.max(containerSize.width / (imgSize.width * w), containerSize.height / (imgSize.height * h));
+    const scaledW = imgSize.width * scale;
+    const scaledH = imgSize.height * scale;
+    const centerX = (x + w / 2) * imgSize.width * scale;
+    const centerY = (y + h / 2) * imgSize.height * scale;
+    const left = Math.min(0, Math.max(containerSize.width - scaledW, containerSize.width / 2 - centerX));
+    const top = Math.min(0, Math.max(containerSize.height - scaledH, containerSize.height / 2 - centerY));
+    return { width: scaledW, height: scaledH, left, top };
+  }, [crop, imgSize, containerSize]);
+
+  return (
+    <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
+      {cropStyle ? (
+        <Image source={{ uri }} style={[{ position: 'absolute' }, cropStyle]} resizeMode="cover" />
+      ) : (
+        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      )}
+    </View>
+  );
+}
+
 function FridgeCard({
   item,
   onDelete,
@@ -269,7 +313,7 @@ function FridgeCard({
     <View style={styles.fcard}>
       <View style={[styles.fcardImg, !item.imagePath && { backgroundColor: getCardBg(item.id) }]}>
         {item.imagePath ? (
-          <Image source={{ uri: item.imagePath }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <CroppedIngredientImage uri={item.imagePath} crop={item.imageCrop} />
         ) : (
           <Text style={styles.fcardEmoji}>{getEmoji(item.name)}</Text>
         )}
@@ -484,6 +528,7 @@ const styles = StyleSheet.create({
     height: 150,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   fcardEmoji: { fontSize: 58 },
   fcardActs: {

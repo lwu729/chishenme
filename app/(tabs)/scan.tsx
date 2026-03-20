@@ -71,7 +71,7 @@ function ConfirmModal({
   index: number;
   total: number;
   photoUri: string;
-  onSave: (input: AddIngredientInput & { imagePath: string }) => void;
+  onSave: (input: AddIngredientInput & { imagePath: string; imageCrop?: { x: number; y: number; width: number; height: number } }) => void;
   onSkip: () => void;
 }) {
   const [name, setName] = useState(item.name);
@@ -144,6 +144,7 @@ function ConfirmModal({
       unit: unit.trim() || '份',
       expiryDate: formatDate(expiryDate),
       imagePath: photoUri,
+      imageCrop: item.boundingBox,
     });
   }
 

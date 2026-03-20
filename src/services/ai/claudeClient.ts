@@ -29,12 +29,14 @@ async function callAPI(body: object): Promise<string> {
 /**
  * 向 Claude API 发送 prompt，返回文本响应。
  */
-export async function callClaude(prompt: string): Promise<string> {
-  return callAPI({
+export async function callClaude(prompt: string, systemPrompt?: string): Promise<string> {
+  const body: Record<string, unknown> = {
     model: CLAUDE_MODEL,
     max_tokens: 4096,
     messages: [{ role: 'user', content: prompt }],
-  });
+  };
+  if (systemPrompt) body.system = systemPrompt;
+  return callAPI(body);
 }
 
 /**
