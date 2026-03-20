@@ -70,6 +70,7 @@ export const CREATE_USER_PREFERENCES_TABLE = `
     cookingTools           TEXT    NOT NULL DEFAULT '[]',
     knives                 TEXT    NOT NULL DEFAULT '[]',
     assistiveTools         TEXT    NOT NULL DEFAULT '[]',
+    measuringTools         TEXT    NOT NULL DEFAULT '[]',
     condiments             TEXT    NOT NULL DEFAULT '[]',
     preferredCuisines      TEXT    NOT NULL DEFAULT '[]',
     preferredCookingMethods TEXT   NOT NULL DEFAULT '[]',

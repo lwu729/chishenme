@@ -29,6 +29,7 @@ export const useUserStore = create<UserStore>((set) => ({
         cookingTools: JSON.parse(row.cookingTools ?? '[]'),
         knives: JSON.parse(row.knives ?? '[]'),
         assistiveTools: JSON.parse(row.assistiveTools ?? '[]'),
+        measuringTools: JSON.parse(row.measuringTools ?? '[]'),
         condiments: JSON.parse(row.condiments ?? '[]'),
         preferredCuisines: JSON.parse(row.preferredCuisines ?? '[]'),
         preferredCookingMethods: JSON.parse(row.preferredCookingMethods ?? '[]'),

@@ -17,7 +17,8 @@ export interface RecipeGenerationContext {
   relatedRecipeStep?: RecipeStep; // 做饭提示时传入当前步骤
 }
 
-const SYSTEM_PROMPT = `你是一个中文菜谱生成助手。根据用户提供的冰箱食材和条件，生成适合的菜谱。
+function buildSystemPrompt(measuringToolsStr: string): string {
+  return `你是一个中文菜谱生成助手。根据用户提供的冰箱食材和条件，生成适合的菜谱。
 严格只返回 JSON，不要任何额外文字或 markdown 代码块，格式如下：
 {
   "recipes": [
@@ -38,16 +39,23 @@ const SYSTEM_PROMPT = `你是一个中文菜谱生成助手。根据用户提供
 }
 注意：
 - 生成恰好 5 个菜谱
-- 食材用量要具体，单位使用克/毫升/个/把等常见单位
+- 所需食材的数量单位规则：
+  - 如果用户没有登记任何测量工具，请使用不需要量器的单位：一碗、一杯、一把、一汤匙、一小撮、一个、一块、一片等，严禁使用克、毫升、ml、g、kg 等需要测量工具的单位
+  - 如果用户登记了测量工具（如下方列出），可以使用对应的精确单位，例如有厨房秤则可用克/公克，有量杯则可用毫升/ml
+  - 用户已登记的测量工具：${measuringToolsStr}
 - 步骤清晰，每步骤有具体操作说明
 - 严格输出 JSON，不要任何前缀或后缀文字`;
+}
 
 /**
  * 根据当前冰箱食材和用户偏好，生成菜谱列表。
  */
 export async function generateRecipes(context: RecipeGenerationContext): Promise<Recipe[]> {
+  const measuringToolsStr = context.userPreference.measuringTools?.length > 0
+    ? context.userPreference.measuringTools.join('、')
+    : '无';
   const prompt = buildPrompt(context);
-  const raw = await callClaude(prompt, SYSTEM_PROMPT);
+  const raw = await callClaude(prompt, buildSystemPrompt(measuringToolsStr));
 
   // 去掉可能的 markdown 代码块标记
   const cleaned = raw
