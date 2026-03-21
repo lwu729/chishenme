@@ -164,6 +164,19 @@ const zh = {
     permissionDenied: '请在系统设置中开启通知权限',
   },
 
+  expirySettings: {
+    title: '过期状态设置',
+    subtitle: '调整食材过期状态的判定条件',
+    urgentTitle: '即将过期',
+    warningTitle: '快过期',
+    daysAndPercent: '剩余天数 ≤ {{days}} 天 且 还需吃 ≥ {{percent}}%',
+    absoluteDays: '或剩余 ≤ {{days}} 天时无条件标记',
+    resetDefault: '恢复默认',
+    validationError: '即将过期的天数阈值必须小于快过期',
+    daysRange: '请输入 {{min}}-{{max}} 之间的整数',
+    percentRange: '请输入 1-99 之间的整数',
+  },
+
   kitchenware: {
     title: '厨具设定',
     saveBtn: '保存设定',

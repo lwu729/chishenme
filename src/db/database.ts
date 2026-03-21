@@ -165,4 +165,24 @@ export function initDatabase(): void {
       "ALTER TABLE user_preferences ADD COLUMN notifyTimeInactive TEXT NOT NULL DEFAULT '09:00'",
     );
   } catch (_) {}
+
+  // 迁移：过期状态阈值字段
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN urgentDays INTEGER NOT NULL DEFAULT 3');
+  } catch (_) {}
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN urgentPercentage INTEGER NOT NULL DEFAULT 50');
+  } catch (_) {}
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN urgentAbsoluteDays INTEGER NOT NULL DEFAULT 1');
+  } catch (_) {}
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN warningDays INTEGER NOT NULL DEFAULT 5');
+  } catch (_) {}
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN warningPercentage INTEGER NOT NULL DEFAULT 75');
+  } catch (_) {}
+  try {
+    database.execSync('ALTER TABLE user_preferences ADD COLUMN warningAbsoluteDays INTEGER NOT NULL DEFAULT 3');
+  } catch (_) {}
 }

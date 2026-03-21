@@ -45,5 +45,13 @@ export interface UserPreference {
   notifyTimeExpired: string;            // 默认 "09:00"
   notifyTimeDailyReminder: string;      // 即将过期/快过期的每日提醒时间，默认 "09:00"
   notifyTimeInactive: string;           // 不活跃提醒时间，默认 "09:00"
+
+  // 过期状态阈值（对应 calculateExpiryStatus 的判定条件）
+  urgentDays: number;           // 即将过期：剩余天数阈值，默认 3
+  urgentPercentage: number;     // 即将过期：还需要吃的百分比阈值，默认 50
+  urgentAbsoluteDays: number;   // 即将过期：无条件判定天数，默认 1
+  warningDays: number;          // 快过期：剩余天数阈值，默认 5
+  warningPercentage: number;    // 快过期：还需要吃的百分比阈值，默认 75
+  warningAbsoluteDays: number;  // 快过期：无条件判定天数，默认 3
 }
 

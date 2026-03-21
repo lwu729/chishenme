@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Switch, ScrollView, TextInput, Alert, Platform,
+  Switch, TextInput, Alert, Platform, Keyboard,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { changeLanguage } from '../src/i18n';
 import { colors, font, radius } from '../src/constants/theme';
+import { DEFAULT_THRESHOLDS } from '../src/utils/expiryUtils';
 import { useUserStore } from '../src/features/user/store';
 import { useIngredientStore } from '../src/features/ingredient/store';
 import { scheduleAllNotifications } from '../src/services/notifications/notificationService';
@@ -101,7 +103,13 @@ export default function SettingsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        extraScrollHeight={120}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 语言设置 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{t('settings.languageSection')}</Text>
@@ -269,7 +277,132 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
-      </ScrollView>
+        {/* 过期状态设置 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t('expirySettings.title')}</Text>
+          <Text style={[styles.notifSub, { marginBottom: 16 }]}>{t('expirySettings.subtitle')}</Text>
+
+          {/* 即将过期组 */}
+          <View style={styles.thresholdGroup}>
+            <View style={styles.thresholdGroupHeader}>
+              <View style={[styles.statusDot, styles.statusDotUrgent]} />
+              <Text style={styles.thresholdGroupTitle}>{t('expirySettings.urgentTitle')}</Text>
+            </View>
+
+            <ThresholdEditRow
+              displayText={t('expirySettings.daysAndPercent', {
+                days: userPreference.urgentDays,
+                percent: userPreference.urgentPercentage,
+              })}
+              fields={[
+                {
+                  value: userPreference.urgentDays,
+                  min: 1, max: 14, unit: currentLang === 'zh' ? '天' : 'd',
+                  errorMsg: t('expirySettings.daysRange', { min: 1, max: 14 }),
+                },
+                {
+                  value: userPreference.urgentPercentage,
+                  min: 1, max: 99, unit: '%',
+                  errorMsg: t('expirySettings.percentRange'),
+                },
+              ]}
+              onSave={(vals) => {
+                if (vals[0] >= userPreference.warningDays) return t('expirySettings.validationError');
+                updatePref({ urgentDays: vals[0], urgentPercentage: vals[1] });
+                return null;
+              }}
+            />
+
+            <ThresholdEditRow
+              displayText={t('expirySettings.absoluteDays', { days: userPreference.urgentAbsoluteDays })}
+              fields={[
+                {
+                  value: userPreference.urgentAbsoluteDays,
+                  min: 1, max: 7, unit: currentLang === 'zh' ? '天' : 'd',
+                  errorMsg: t('expirySettings.daysRange', { min: 1, max: 7 }),
+                },
+              ]}
+              onSave={(vals) => {
+                if (vals[0] >= userPreference.warningAbsoluteDays) return t('expirySettings.validationError');
+                updatePref({ urgentAbsoluteDays: vals[0] });
+                return null;
+              }}
+            />
+
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={() => updatePref({
+                urgentDays: DEFAULT_THRESHOLDS.urgentDays,
+                urgentPercentage: DEFAULT_THRESHOLDS.urgentPercentage,
+                urgentAbsoluteDays: DEFAULT_THRESHOLDS.urgentAbsoluteDays,
+              })}
+            >
+              <Text style={styles.resetBtnText}>{t('expirySettings.resetDefault')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* 快过期组 */}
+          <View style={styles.thresholdGroup}>
+            <View style={styles.thresholdGroupHeader}>
+              <View style={[styles.statusDot, styles.statusDotWarning]} />
+              <Text style={styles.thresholdGroupTitle}>{t('expirySettings.warningTitle')}</Text>
+            </View>
+
+            <ThresholdEditRow
+              displayText={t('expirySettings.daysAndPercent', {
+                days: userPreference.warningDays,
+                percent: userPreference.warningPercentage,
+              })}
+              fields={[
+                {
+                  value: userPreference.warningDays,
+                  min: 1, max: 30, unit: currentLang === 'zh' ? '天' : 'd',
+                  errorMsg: t('expirySettings.daysRange', { min: 1, max: 30 }),
+                },
+                {
+                  value: userPreference.warningPercentage,
+                  min: 1, max: 99, unit: '%',
+                  errorMsg: t('expirySettings.percentRange'),
+                },
+              ]}
+              onSave={(vals) => {
+                if (userPreference.urgentDays >= vals[0]) return t('expirySettings.validationError');
+                updatePref({ warningDays: vals[0], warningPercentage: vals[1] });
+                return null;
+              }}
+            />
+
+            <ThresholdEditRow
+              displayText={t('expirySettings.absoluteDays', { days: userPreference.warningAbsoluteDays })}
+              fields={[
+                {
+                  value: userPreference.warningAbsoluteDays,
+                  min: 1, max: 14, unit: currentLang === 'zh' ? '天' : 'd',
+                  errorMsg: t('expirySettings.daysRange', { min: 1, max: 14 }),
+                },
+              ]}
+              onSave={(vals) => {
+                if (userPreference.urgentAbsoluteDays >= vals[0]) return t('expirySettings.validationError');
+                updatePref({ warningAbsoluteDays: vals[0] });
+                return null;
+              }}
+            />
+
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={() => updatePref({
+                warningDays: DEFAULT_THRESHOLDS.warningDays,
+                warningPercentage: DEFAULT_THRESHOLDS.warningPercentage,
+                warningAbsoluteDays: DEFAULT_THRESHOLDS.warningAbsoluteDays,
+              })}
+            >
+              <Text style={styles.resetBtnText}>{t('expirySettings.resetDefault')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAwareScrollView>
 
       {/* DateTimePicker with Save / Cancel (iOS only; Android auto-confirms) */}
       {pickerVisible && Platform.OS === 'ios' && (
@@ -403,6 +536,9 @@ function InactiveRow({ enabled, isOn, onToggle, days, onDaysChange, title, subti
               maxLength={2}
               autoFocus
               selectTextOnFocus
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
+              blurOnSubmit
             />
             <View style={styles.daysEditBtns}>
               <TouchableOpacity style={styles.secondaryBtn} onPress={handleCancelDays}>
@@ -433,6 +569,93 @@ function InactiveRow({ enabled, isOn, onToggle, days, onDaysChange, title, subti
           thumbColor="#fff"
         />
       </View>
+    </View>
+  );
+}
+
+// ─── ThresholdEditRow ─────────────────────────────────────────────────────────
+
+interface ThresholdField {
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  errorMsg: string;
+}
+
+interface ThresholdEditRowProps {
+  displayText: string;
+  fields: ThresholdField[];
+  onSave: (values: number[]) => string | null;
+}
+
+function ThresholdEditRow({ displayText, fields, onSave }: ThresholdEditRowProps) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState<string[]>([]);
+
+  function startEdit() {
+    setDrafts(fields.map(f => String(f.value)));
+    setEditing(true);
+  }
+
+  function handleSave() {
+    const parsed = drafts.map(d => parseInt(d, 10));
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      if (isNaN(parsed[i]) || parsed[i] < f.min || parsed[i] > f.max) {
+        Alert.alert('', f.errorMsg);
+        return;
+      }
+    }
+    const err = onSave(parsed);
+    if (err) { Alert.alert('', err); return; }
+    setEditing(false);
+  }
+
+  function setDraft(idx: number, val: string) {
+    const next = [...drafts];
+    next[idx] = val;
+    setDrafts(next);
+  }
+
+  return (
+    <View style={styles.thresholdRow}>
+      {!editing ? (
+        <TouchableOpacity onPress={startEdit} activeOpacity={0.7}>
+          <Text style={[styles.notifSub, styles.subtitleEditable]}>{displayText}</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.daysEditBlock}>
+          <View style={styles.thresholdInputRow}>
+            {fields.map((f, idx) => (
+              <View key={idx} style={styles.thresholdInputGroup}>
+                <TextInput
+                  style={styles.daysEditInput}
+                  keyboardType="number-pad"
+                  value={drafts[idx]}
+                  onChangeText={v => setDraft(idx, v)}
+                  maxLength={3}
+                  autoFocus={idx === 0}
+                  selectTextOnFocus
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit
+                />
+                <Text style={styles.thresholdUnitLabel}>{f.unit}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.daysEditBtns}>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => setEditing(false)}>
+              <Text style={styles.secondaryBtnText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleSave}>
+              <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -679,6 +902,67 @@ const styles = StyleSheet.create({
     fontFamily: font.family,
     fontWeight: font.medium,
     color: colors.g600,
+  },
+  // Expiry threshold section
+  thresholdGroup: {
+    marginBottom: 4,
+  },
+  thresholdGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  thresholdGroupTitle: {
+    fontSize: 13,
+    fontWeight: font.medium,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusDotUrgent: {
+    backgroundColor: '#EF4444',
+  },
+  statusDotWarning: {
+    backgroundColor: '#F97316',
+  },
+  thresholdRow: {
+    paddingVertical: 4,
+  },
+  thresholdInputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  thresholdInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  thresholdUnitLabel: {
+    fontSize: 13,
+    color: colors.g600,
+    fontFamily: font.family,
+  },
+  resetBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.badge,
+    backgroundColor: colors.g50,
+    borderWidth: 1,
+    borderColor: colors.g100,
+  },
+  resetBtnText: {
+    fontSize: 12,
+    color: '#AAAAAA',
+    fontFamily: font.family,
   },
   // Time picker panel
   pickerPanel: {

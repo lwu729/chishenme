@@ -164,6 +164,19 @@ const en = {
     permissionDenied: 'Please enable notifications in system settings',
   },
 
+  expirySettings: {
+    title: 'Expiry Status Settings',
+    subtitle: 'Customize when ingredients are marked as expiring',
+    urgentTitle: 'Expiring Soon',
+    warningTitle: 'Expiring',
+    daysAndPercent: '≤ {{days}} days left AND ≥ {{percent}}% remaining',
+    absoluteDays: 'OR always mark if ≤ {{days}} day(s) left',
+    resetDefault: 'Reset to Default',
+    validationError: 'Urgent threshold must be less than warning threshold',
+    daysRange: 'Please enter a number between {{min}} and {{max}}',
+    percentRange: 'Please enter a number between 1 and 99',
+  },
+
   kitchenware: {
     title: 'Kitchen Setup',
     saveBtn: 'Save Settings',

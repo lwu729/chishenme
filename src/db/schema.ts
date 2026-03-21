@@ -88,7 +88,13 @@ export const CREATE_USER_PREFERENCES_TABLE = `
     notifyTimeStatusChange        TEXT    NOT NULL DEFAULT '09:00',
     notifyTimeExpired             TEXT    NOT NULL DEFAULT '09:00',
     notifyTimeDailyReminder       TEXT    NOT NULL DEFAULT '09:00',
-    notifyTimeInactive            TEXT    NOT NULL DEFAULT '09:00'
+    notifyTimeInactive            TEXT    NOT NULL DEFAULT '09:00',
+    urgentDays                    INTEGER NOT NULL DEFAULT 3,
+    urgentPercentage              INTEGER NOT NULL DEFAULT 50,
+    urgentAbsoluteDays            INTEGER NOT NULL DEFAULT 1,
+    warningDays                   INTEGER NOT NULL DEFAULT 5,
+    warningPercentage             INTEGER NOT NULL DEFAULT 75,
+    warningAbsoluteDays           INTEGER NOT NULL DEFAULT 3
   );
 `;
 

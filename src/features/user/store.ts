@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { UserEvent, UserPreference } from './types';
 import { getDatabase } from '../../db/database';
+import { useIngredientStore } from '../ingredient/store';
+import { scheduleAllNotifications } from '../../services/notifications/notificationService';
+import i18n from '../../i18n';
 
 interface UserStore {
   userEvent: UserEvent | null;
@@ -40,10 +43,16 @@ function rowToPreference(row: any): UserPreference {
     notifyTimeExpired: row.notifyTimeExpired ?? '09:00',
     notifyTimeDailyReminder: row.notifyTimeDailyReminder ?? '09:00',
     notifyTimeInactive: row.notifyTimeInactive ?? '09:00',
+    urgentDays: row.urgentDays ?? 3,
+    urgentPercentage: row.urgentPercentage ?? 50,
+    urgentAbsoluteDays: row.urgentAbsoluteDays ?? 1,
+    warningDays: row.warningDays ?? 5,
+    warningPercentage: row.warningPercentage ?? 75,
+    warningAbsoluteDays: row.warningAbsoluteDays ?? 3,
   };
 }
 
-export const useUserStore = create<UserStore>((set) => ({
+export const useUserStore = create<UserStore>((set, get) => ({
   userEvent: null,
   userPreference: null,
 
@@ -111,6 +120,17 @@ export const useUserStore = create<UserStore>((set) => ({
       }
     }
 
+    const thresholdFields: (keyof typeof updates)[] = [
+      'urgentDays', 'urgentPercentage', 'urgentAbsoluteDays',
+      'warningDays', 'warningPercentage', 'warningAbsoluteDays',
+    ];
+    for (const field of thresholdFields) {
+      if (field in updates) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field] as number);
+      }
+    }
+
     if (setClauses.length === 0) return;
 
     values.push(1); // WHERE id = 1
@@ -121,5 +141,17 @@ export const useUserStore = create<UserStore>((set) => ({
 
     const row = db.getFirstSync<any>('SELECT * FROM user_preferences WHERE id = 1');
     if (row) set({ userPreference: rowToPreference(row) });
+
+    // 如有阈值变化，重新计算所有食材过期状态，并重排通知
+    const hasThresholdChange = thresholdFields.some(f => f in updates);
+    if (hasThresholdChange) {
+      useIngredientStore.getState().loadIngredients();
+      const { ingredients } = useIngredientStore.getState();
+      const updatedPref = get().userPreference;
+      const currentEvent = get().userEvent;
+      if (updatedPref) {
+        scheduleAllNotifications(ingredients, updatedPref, currentEvent, i18n.language as 'zh' | 'en');
+      }
+    }
   },
 }));

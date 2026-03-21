@@ -1,43 +1,61 @@
 import { ExpiryStatus } from '../features/ingredient/types';
 
+export interface ExpiryThresholds {
+  urgentDays: number;
+  urgentPercentage: number;
+  urgentAbsoluteDays: number;
+  warningDays: number;
+  warningPercentage: number;
+  warningAbsoluteDays: number;
+}
+
+export const DEFAULT_THRESHOLDS: ExpiryThresholds = {
+  urgentDays: 3,
+  urgentPercentage: 50,
+  urgentAbsoluteDays: 1,
+  warningDays: 5,
+  warningPercentage: 75,
+  warningAbsoluteDays: 3,
+};
+
 /**
  * 根据剩余天数和剩余百分比计算过期状态。
  *
  * 判断顺序（严格按照）：
  *   1. 已过期：daysUntilExpiry < 0
- *   2. 即将过期：daysUntilExpiry ≤ 3 且 remainingPercentage ≥ 50，OR daysUntilExpiry ≤ 1
- *   3. 快过期：daysUntilExpiry ≤ 5 且 remainingPercentage ≥ 75，OR daysUntilExpiry ≤ 3
+ *   2. 即将过期：daysUntilExpiry ≤ urgentDays 且 remainingPercentage ≥ urgentPercentage，
+ *              OR daysUntilExpiry ≤ urgentAbsoluteDays
+ *   3. 快过期：daysUntilExpiry ≤ warningDays 且 remainingPercentage ≥ warningPercentage，
+ *              OR daysUntilExpiry ≤ warningAbsoluteDays
  *   4. 新鲜：其余所有情况
  *
  * @param daysUntilExpiry - 距离过期日的天数（负数表示已过期）
  * @param remainingPercentage - 还需要消耗的百分比（0–100）
+ * @param thresholds - 阈值配置（默认使用 DEFAULT_THRESHOLDS）
  */
 export function calculateExpiryStatus(
   daysUntilExpiry: number,
   remainingPercentage: number,
+  thresholds: ExpiryThresholds = DEFAULT_THRESHOLDS,
 ): ExpiryStatus {
-  // 1. 已过期
   if (daysUntilExpiry < 0) {
     return ExpiryStatus.EXPIRED;
   }
 
-  // 2. 即将过期
   if (
-    (daysUntilExpiry <= 3 && remainingPercentage >= 50) ||
-    daysUntilExpiry <= 1
+    (daysUntilExpiry <= thresholds.urgentDays && remainingPercentage >= thresholds.urgentPercentage) ||
+    daysUntilExpiry <= thresholds.urgentAbsoluteDays
   ) {
     return ExpiryStatus.URGENT;
   }
 
-  // 3. 快过期
   if (
-    (daysUntilExpiry <= 5 && remainingPercentage >= 75) ||
-    daysUntilExpiry <= 3
+    (daysUntilExpiry <= thresholds.warningDays && remainingPercentage >= thresholds.warningPercentage) ||
+    daysUntilExpiry <= thresholds.warningAbsoluteDays
   ) {
     return ExpiryStatus.WARNING;
   }
 
-  // 4. 新鲜
   return ExpiryStatus.FRESH;
 }
 
