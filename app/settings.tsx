@@ -1,18 +1,96 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity,
+  Switch, ScrollView, TextInput, Alert, Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { changeLanguage } from '../src/i18n';
 import { colors, font, radius } from '../src/constants/theme';
+import { useUserStore } from '../src/features/user/store';
+import { useIngredientStore } from '../src/features/ingredient/store';
+import { scheduleAllNotifications } from '../src/services/notifications/notificationService';
+import i18n from '../src/i18n';
+
+function timeStringToDate(timeStr: string): Date {
+  const [h, m] = timeStr.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h || 9, m || 0, 0, 0);
+  return d;
+}
+
+function dateToTimeString(date: Date): string {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const currentLang = i18n.language as 'zh' | 'en';
+  const { t } = useTranslation();
+  const { i18n: i18nInstance } = useTranslation();
+  const currentLang = i18nInstance.language as 'zh' | 'en';
+
+  const { userPreference, updateUserPreference } = useUserStore();
+  const { ingredients } = useIngredientStore();
+  const { userEvent } = useUserStore();
+
+  // DateTimePicker state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerField, setPickerField] = useState<
+    'notifyTimeStatusChange' | 'notifyTimeExpired' | 'notifyTimeDailyReminder' | 'notifyTimeInactive'
+  >('notifyTimeStatusChange');
+  const [pickerDate, setPickerDate] = useState(new Date());
+  const [pendingDate, setPendingDate] = useState(new Date());
 
   async function handleLanguageChange(lang: 'zh' | 'en') {
     await changeLanguage(lang);
   }
+
+  function updatePref(changes: Parameters<typeof updateUserPreference>[0]) {
+    updateUserPreference(changes);
+    // Re-read updated pref and reschedule
+    setTimeout(() => {
+      const { userPreference: pref, userEvent: evt } = useUserStore.getState();
+      if (pref) {
+        scheduleAllNotifications(ingredients, pref, evt, i18n.language as 'zh' | 'en');
+      }
+    }, 100);
+  }
+
+  function openTimePicker(field: typeof pickerField, currentTime: string) {
+    const d = timeStringToDate(currentTime);
+    setPickerField(field);
+    setPickerDate(d);
+    setPendingDate(d);
+    setPickerVisible(true);
+  }
+
+  function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
+    if (event.type === 'dismissed') { setPickerVisible(false); return; }
+    if (!date) return;
+    setPendingDate(date);
+    if (Platform.OS === 'android') {
+      // Android 没有内联 spinner，选完即确认
+      updatePref({ [pickerField]: dateToTimeString(date) });
+      setPickerVisible(false);
+    }
+  }
+
+  function handleTimeSave() {
+    updatePref({ [pickerField]: dateToTimeString(pendingDate) });
+    setPickerVisible(false);
+  }
+
+  function handleTimeCancel() {
+    setPickerVisible(false);
+  }
+
+  if (!userPreference) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+
+  const notifEnabled = userPreference.notificationsEnabled;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -25,33 +103,297 @@ export default function SettingsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* 语言设置 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>{t('settings.languageSection')}</Text>
-        <View style={styles.langRow}>
-          <TouchableOpacity
-            style={[styles.langBtn, currentLang === 'zh' && styles.langBtnActive]}
-            onPress={() => handleLanguageChange('zh')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.langBtnText, currentLang === 'zh' && styles.langBtnTextActive]}>
-              🇨🇳 {t('settings.zh')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.langBtn, currentLang === 'en' && styles.langBtnActive]}
-            onPress={() => handleLanguageChange('en')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.langBtnText, currentLang === 'en' && styles.langBtnTextActive]}>
-              🇺🇸 {t('settings.en')}
-            </Text>
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* 语言设置 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t('settings.languageSection')}</Text>
+          <View style={styles.langRow}>
+            <TouchableOpacity
+              style={[styles.langBtn, currentLang === 'zh' && styles.langBtnActive]}
+              onPress={() => handleLanguageChange('zh')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.langBtnText, currentLang === 'zh' && styles.langBtnTextActive]}>
+                🇨🇳 {t('settings.zh')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, currentLang === 'en' && styles.langBtnActive]}
+              onPress={() => handleLanguageChange('en')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.langBtnText, currentLang === 'en' && styles.langBtnTextActive]}>
+                🇺🇸 {t('settings.en')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+
+        {/* 通知设置 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t('notifications.title')}</Text>
+
+          {/* 总开关 */}
+          <View style={styles.masterRow}>
+            <Text style={styles.masterIcon}>🔔</Text>
+            <Text style={styles.masterLabel}>{t('notifications.masterSwitch')}</Text>
+            <Switch
+              value={notifEnabled}
+              onValueChange={(v) => updatePref({ notificationsEnabled: v })}
+              trackColor={{ false: colors.g100, true: colors.g400 }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={[styles.subItems, !notifEnabled && styles.disabled]}>
+            {/* 子项一：状态变化 */}
+            <NotifRow
+              enabled={notifEnabled}
+              checked={userPreference.notifyOnStatusChange}
+              onToggle={(v) => updatePref({ notifyOnStatusChange: v })}
+              title={t('notifications.statusChange')}
+              subtitle={t('notifications.statusChangeSub')}
+              timeLabel={t('notifications.timeLabel')}
+              timeValue={userPreference.notifyTimeStatusChange}
+              onTimePress={() => openTimePicker('notifyTimeStatusChange', userPreference.notifyTimeStatusChange)}
+            />
+
+            <View style={styles.divider} />
+
+            {/* 子项二：食材到期 */}
+            <NotifRow
+              enabled={notifEnabled}
+              checked={userPreference.notifyOnExpired}
+              onToggle={(v) => updatePref({ notifyOnExpired: v })}
+              title={t('notifications.onExpired')}
+              subtitle={t('notifications.onExpiredSub')}
+              timeLabel={t('notifications.timeLabel')}
+              timeValue={userPreference.notifyTimeExpired}
+              onTimePress={() => openTimePicker('notifyTimeExpired', userPreference.notifyTimeExpired)}
+            />
+
+            <View style={styles.divider} />
+
+            {/* 子项三：每日提醒（多选 pill） */}
+            <View style={styles.notifItem}>
+              <View style={styles.notifLeft}>
+                <Text style={[styles.notifTitle, !notifEnabled && styles.textDisabled]}>
+                  {t('notifications.dailyReminder')}
+                </Text>
+                <Text style={[styles.notifSub, !notifEnabled && styles.textDisabled]}>
+                  {t('notifications.dailyReminderSub')}
+                </Text>
+                <View style={styles.pillRow}>
+                  <TouchableOpacity
+                    disabled={!notifEnabled}
+                    style={[
+                      styles.pill,
+                      userPreference.notifyOnUrgent && notifEnabled && styles.pillActive,
+                    ]}
+                    onPress={() => updatePref({ notifyOnUrgent: !userPreference.notifyOnUrgent })}
+                  >
+                    <Text style={[
+                      styles.pillText,
+                      userPreference.notifyOnUrgent && notifEnabled && styles.pillTextActive,
+                    ]}>
+                      {t('notifications.urgent')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={!notifEnabled}
+                    style={[
+                      styles.pill,
+                      userPreference.notifyOnWarning && notifEnabled && styles.pillActive,
+                    ]}
+                    onPress={() => updatePref({ notifyOnWarning: !userPreference.notifyOnWarning })}
+                  >
+                    <Text style={[
+                      styles.pillText,
+                      userPreference.notifyOnWarning && notifEnabled && styles.pillTextActive,
+                    ]}>
+                      {t('notifications.warning')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity
+                disabled={!notifEnabled}
+                style={[styles.timeBtn, !notifEnabled && styles.timeBtnDisabled]}
+                onPress={() => openTimePicker('notifyTimeDailyReminder', userPreference.notifyTimeDailyReminder)}
+              >
+                <Text style={[styles.timeBtnLabel, !notifEnabled && styles.textDisabled]}>
+                  {t('notifications.timeLabel')}
+                </Text>
+                <Text style={[styles.timeBtnValue, !notifEnabled && styles.textDisabled]}>
+                  {userPreference.notifyTimeDailyReminder}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* 子项四：未录入食材提醒 */}
+            <InactiveRow
+              enabled={notifEnabled}
+              isOn={userPreference.notifyInactiveIngredientDays > 0}
+              onToggle={(v) => updatePref({ notifyInactiveIngredientDays: v ? 7 : 0 })}
+              days={userPreference.notifyInactiveIngredientDays > 0 ? userPreference.notifyInactiveIngredientDays : 7}
+              onDaysChange={(d) => updatePref({ notifyInactiveIngredientDays: d })}
+              title={t('notifications.inactiveIngredient')}
+              subtitle={t('notifications.inactiveIngredientSub', {
+                days: userPreference.notifyInactiveIngredientDays > 0
+                  ? userPreference.notifyInactiveIngredientDays : 7,
+              })}
+              timeLabel={t('notifications.timeLabel')}
+              timeValue={userPreference.notifyTimeInactive}
+              onTimePress={() => openTimePicker('notifyTimeInactive', userPreference.notifyTimeInactive)}
+            />
+
+            <View style={styles.divider} />
+
+            {/* 子项五：未生成菜谱提醒 */}
+            <InactiveRow
+              enabled={notifEnabled}
+              isOn={userPreference.notifyInactiveRecipeDays > 0}
+              onToggle={(v) => updatePref({ notifyInactiveRecipeDays: v ? 3 : 0 })}
+              days={userPreference.notifyInactiveRecipeDays > 0 ? userPreference.notifyInactiveRecipeDays : 3}
+              onDaysChange={(d) => updatePref({ notifyInactiveRecipeDays: d })}
+              title={t('notifications.inactiveRecipe')}
+              subtitle={t('notifications.inactiveRecipeSub', {
+                days: userPreference.notifyInactiveRecipeDays > 0
+                  ? userPreference.notifyInactiveRecipeDays : 3,
+              })}
+              timeLabel={t('notifications.timeLabel')}
+              timeValue={userPreference.notifyTimeInactive}
+              onTimePress={() => openTimePicker('notifyTimeInactive', userPreference.notifyTimeInactive)}
+            />
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* DateTimePicker with Save / Cancel (iOS only; Android auto-confirms) */}
+      {pickerVisible && Platform.OS === 'ios' && (
+        <View style={styles.pickerPanel}>
+          <DateTimePicker
+            value={pendingDate}
+            mode="time"
+            is24Hour
+            display="spinner"
+            onChange={handleTimeChange}
+            style={{ width: '100%' }}
+          />
+          <View style={styles.pickerBtnRow}>
+            <TouchableOpacity style={styles.pickerCancelBtn} onPress={handleTimeCancel}>
+              <Text style={styles.pickerCancelText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pickerSaveBtn} onPress={handleTimeSave}>
+              <Text style={styles.pickerSaveText}>{t('common.save')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+interface NotifRowProps {
+  enabled: boolean;
+  checked: boolean;
+  onToggle: (v: boolean) => void;
+  title: string;
+  subtitle: string;
+  timeLabel: string;
+  timeValue: string;
+  onTimePress: () => void;
+}
+
+function NotifRow({ enabled, checked, onToggle, title, subtitle, timeLabel, timeValue, onTimePress }: NotifRowProps) {
+  return (
+    <View style={styles.notifItem}>
+      <View style={styles.notifLeft}>
+        <Text style={[styles.notifTitle, !enabled && styles.textDisabled]}>{title}</Text>
+        <Text style={[styles.notifSub, !enabled && styles.textDisabled]}>{subtitle}</Text>
+      </View>
+      <View style={styles.notifRight}>
+        <TouchableOpacity
+          disabled={!enabled || !checked}
+          style={[styles.timeBtn, (!enabled || !checked) && styles.timeBtnDisabled]}
+          onPress={onTimePress}
+        >
+          <Text style={[styles.timeBtnLabel, (!enabled || !checked) && styles.textDisabled]}>{timeLabel}</Text>
+          <Text style={[styles.timeBtnValue, (!enabled || !checked) && styles.textDisabled]}>{timeValue}</Text>
+        </TouchableOpacity>
+        <Switch
+          value={checked && enabled}
+          disabled={!enabled}
+          onValueChange={onToggle}
+          trackColor={{ false: colors.g100, true: colors.g400 }}
+          thumbColor="#fff"
+        />
+      </View>
+    </View>
+  );
+}
+
+interface InactiveRowProps {
+  enabled: boolean;
+  isOn: boolean;
+  onToggle: (v: boolean) => void;
+  days: number;
+  onDaysChange: (d: number) => void;
+  title: string;
+  subtitle: string;
+  timeLabel: string;
+  timeValue: string;
+  onTimePress: () => void;
+}
+
+function InactiveRow({ enabled, isOn, onToggle, days, onDaysChange, title, subtitle, timeLabel, timeValue, onTimePress }: InactiveRowProps) {
+  const active = enabled && isOn;
+  return (
+    <View style={styles.notifItem}>
+      <View style={styles.notifLeft}>
+        <Text style={[styles.notifTitle, !enabled && styles.textDisabled]}>{title}</Text>
+        <Text style={[styles.notifSub, !enabled && styles.textDisabled]}>{subtitle}</Text>
+        {active && (
+          <View style={styles.daysRow}>
+            <TextInput
+              style={styles.daysInput}
+              keyboardType="number-pad"
+              value={String(days)}
+              onChangeText={(v) => {
+                const n = parseInt(v, 10);
+                if (!isNaN(n) && n >= 1 && n <= 30) onDaysChange(n);
+              }}
+              maxLength={2}
+            />
+          </View>
+        )}
+      </View>
+      <View style={styles.notifRight}>
+        <TouchableOpacity
+          disabled={!active}
+          style={[styles.timeBtn, !active && styles.timeBtnDisabled]}
+          onPress={onTimePress}
+        >
+          <Text style={[styles.timeBtnLabel, !active && styles.textDisabled]}>{timeLabel}</Text>
+          <Text style={[styles.timeBtnValue, !active && styles.textDisabled]}>{timeValue}</Text>
+        </TouchableOpacity>
+        <Switch
+          value={isOn && enabled}
+          disabled={!enabled}
+          onValueChange={onToggle}
+          trackColor={{ false: colors.g100, true: colors.g400 }}
+          thumbColor="#fff"
+        />
+      </View>
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safe: {
@@ -85,6 +427,9 @@ const styles = StyleSheet.create({
     fontWeight: font.medium,
     color: colors.g800,
     fontFamily: font.family,
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   section: {
     marginTop: 24,
@@ -126,6 +471,170 @@ const styles = StyleSheet.create({
     color: colors.g600,
   },
   langBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  // Notification styles
+  masterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  masterIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  masterLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: font.medium,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  subItems: {
+    borderTopWidth: 1,
+    borderTopColor: colors.g100,
+    paddingTop: 4,
+  },
+  disabled: {
+    opacity: 0.45,
+  },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  notifLeft: {
+    flex: 1,
+  },
+  notifRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 2,
+  },
+  notifTitle: {
+    fontSize: 14,
+    fontWeight: font.medium,
+    color: colors.g800,
+    fontFamily: font.family,
+    marginBottom: 2,
+  },
+  notifSub: {
+    fontSize: 12,
+    color: '#AAAAAA',
+    fontFamily: font.family,
+  },
+  textDisabled: {
+    color: '#CCCCCC',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.g100,
+  },
+  timeBtn: {
+    backgroundColor: colors.g50,
+    borderRadius: radius.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 52,
+  },
+  timeBtnDisabled: {
+    backgroundColor: colors.g50,
+  },
+  timeBtnLabel: {
+    fontSize: 10,
+    color: '#AAAAAA',
+    fontFamily: font.family,
+  },
+  timeBtnValue: {
+    fontSize: 13,
+    fontWeight: font.medium,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.tag,
+    backgroundColor: colors.g50,
+    borderWidth: 1.5,
+    borderColor: colors.g100,
+  },
+  pillActive: {
+    backgroundColor: colors.g600,
+    borderColor: colors.g600,
+  },
+  pillText: {
+    fontSize: 12,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: colors.g600,
+  },
+  pillTextActive: {
+    color: '#FFFFFF',
+  },
+  daysRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  daysInput: {
+    width: 44,
+    height: 32,
+    borderRadius: radius.badge,
+    backgroundColor: colors.g50,
+    borderWidth: 1.5,
+    borderColor: colors.g100,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: font.medium,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  pickerPanel: {
+    backgroundColor: colors.backgroundCard,
+    borderTopWidth: 1,
+    borderTopColor: colors.g100,
+    paddingBottom: 16,
+  },
+  pickerBtnRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  pickerCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: radius.button,
+    backgroundColor: colors.g50,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.g100,
+  },
+  pickerCancelText: {
+    fontSize: 15,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: colors.g600,
+  },
+  pickerSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: radius.button,
+    backgroundColor: colors.g800,
+    alignItems: 'center',
+  },
+  pickerSaveText: {
+    fontSize: 15,
+    fontFamily: font.family,
+    fontWeight: font.medium,
     color: '#FFFFFF',
   },
 });

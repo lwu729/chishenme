@@ -108,4 +108,61 @@ export function initDatabase(): void {
   } catch (_) {
     // 列已存在，忽略
   }
+
+  // 迁移：通知设置字段
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notificationsEnabled INTEGER NOT NULL DEFAULT 1',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyOnStatusChange INTEGER NOT NULL DEFAULT 1',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyOnExpired INTEGER NOT NULL DEFAULT 1',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyOnUrgent INTEGER NOT NULL DEFAULT 1',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyOnWarning INTEGER NOT NULL DEFAULT 1',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyInactiveIngredientDays INTEGER NOT NULL DEFAULT 7',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN notifyInactiveRecipeDays INTEGER NOT NULL DEFAULT 3',
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN notifyTimeStatusChange TEXT NOT NULL DEFAULT '09:00'",
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN notifyTimeExpired TEXT NOT NULL DEFAULT '09:00'",
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN notifyTimeDailyReminder TEXT NOT NULL DEFAULT '09:00'",
+    );
+  } catch (_) {}
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN notifyTimeInactive TEXT NOT NULL DEFAULT '09:00'",
+    );
+  } catch (_) {}
 }

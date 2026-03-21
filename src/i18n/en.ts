@@ -144,6 +144,26 @@ const en = {
     en: 'English',
   },
 
+  notifications: {
+    title: 'Notifications',
+    masterSwitch: 'Enable Notifications',
+    statusChange: 'Notify on status change',
+    statusChangeSub: 'Fresh → Expiring → Urgent → Expired',
+    onExpired: 'Notify when expired',
+    onExpiredSub: 'Remind on expiry day',
+    dailyReminder: 'Daily expiry reminder',
+    dailyReminderSub: 'Daily reminder for selected statuses',
+    urgent: 'Urgent',
+    warning: 'Warning',
+    inactiveIngredient: 'Inactivity reminder (ingredients)',
+    inactiveIngredientSub: 'Remind after {{days}} days without adding ingredients',
+    inactiveRecipe: 'Inactivity reminder (recipes)',
+    inactiveRecipeSub: 'Remind after {{days}} days without generating recipes',
+    timeLabel: 'Remind at',
+    daysLabel: 'Days',
+    permissionDenied: 'Please enable notifications in system settings',
+  },
+
   kitchenware: {
     title: 'Kitchen Setup',
     saveBtn: 'Save Settings',

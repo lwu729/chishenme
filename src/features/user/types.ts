@@ -30,5 +30,20 @@ export interface UserPreference {
   preferredCookingMethods: string[];
   preferredFlavors: string[];
   activeBirdId: string | null; // 当前激活的小鸟伙伴 id
+
+  // 通知设置
+  notificationsEnabled: boolean;        // 总开关，默认 true
+  notifyOnStatusChange: boolean;        // 食材状态变化时通知，默认 true
+  notifyOnExpired: boolean;             // 食材到期时通知，默认 true
+  notifyOnUrgent: boolean;              // 即将过期每日提醒，默认 true
+  notifyOnWarning: boolean;             // 快过期每日提醒，默认 true
+  notifyInactiveIngredientDays: number; // x天没有录入食材提醒，默认 7，0 = 关闭
+  notifyInactiveRecipeDays: number;     // x天没有生成菜谱提醒，默认 3，0 = 关闭
+
+  // 通知时间（24小时制，存为 "HH:MM" 字符串）
+  notifyTimeStatusChange: string;       // 默认 "09:00"
+  notifyTimeExpired: string;            // 默认 "09:00"
+  notifyTimeDailyReminder: string;      // 即将过期/快过期的每日提醒时间，默认 "09:00"
+  notifyTimeInactive: string;           // 不活跃提醒时间，默认 "09:00"
 }
 

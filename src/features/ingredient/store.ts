@@ -3,6 +3,9 @@ import { Ingredient, StorageLocation, IngredientFilterState } from './types';
 import { getDatabase } from '../../db/database';
 import { calculateExpiryStatus, calculateDaysUntilExpiry } from '../../utils/expiryUtils';
 import { useRecipeStore } from '../recipe/store';
+import { scheduleAllNotifications } from '../../services/notifications/notificationService';
+import { useUserStore } from '../user/store';
+import i18n from '../../i18n';
 
 const EXPIRY_SORT_ORDER: Record<string, number> = {
   expired: 0,
@@ -88,6 +91,11 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
 
     get().loadIngredients();
     useRecipeStore.getState().invalidateCache();
+    const { ingredients } = get();
+    const { userPreference, userEvent } = useUserStore.getState();
+    if (userPreference) {
+      scheduleAllNotifications(ingredients, userPreference, userEvent, i18n.language as 'zh' | 'en');
+    }
   },
 
   updateIngredient: (id, updates) => {
@@ -115,6 +123,11 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     db.runSync('DELETE FROM ingredients WHERE id = ?', [id]);
     get().loadIngredients();
     useRecipeStore.getState().invalidateCache();
+    const { ingredients } = get();
+    const { userPreference, userEvent } = useUserStore.getState();
+    if (userPreference) {
+      scheduleAllNotifications(ingredients, userPreference, userEvent, i18n.language as 'zh' | 'en');
+    }
   },
 
   setFilterState: (id, filterState) => {

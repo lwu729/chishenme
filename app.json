@@ -16,7 +16,10 @@
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": false,
-      "bundleIdentifier": "com.chishenme.app"
+      "bundleIdentifier": "com.chishenme.app",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "用于提醒你冰箱里的食材快要过期了"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -43,6 +46,14 @@
           "cameraPermission": "吃什么需要访问相机来拍摄食材照片",
           "microphonePermission": false,
           "photosPermission": "吃什么需要访问相册来选择食材照片"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4CB050",
+          "sounds": []
         }
       ]
     ],

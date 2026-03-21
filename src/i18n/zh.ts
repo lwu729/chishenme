@@ -144,6 +144,26 @@ const zh = {
     en: 'English',
   },
 
+  notifications: {
+    title: '通知设置',
+    masterSwitch: '开启通知',
+    statusChange: '状态变化时通知',
+    statusChangeSub: '新鲜→快过期→即将过期→已过期',
+    onExpired: '食材到期时通知',
+    onExpiredSub: '食材到期当天提醒',
+    dailyReminder: '每日过期提醒',
+    dailyReminderSub: '每天提醒以下状态的食材',
+    urgent: '即将过期',
+    warning: '快过期',
+    inactiveIngredient: '未录入食材提醒',
+    inactiveIngredientSub: '超过 {{days}} 天未录入时提醒',
+    inactiveRecipe: '未生成菜谱提醒',
+    inactiveRecipeSub: '超过 {{days}} 天未生成时提醒',
+    timeLabel: '提醒时间',
+    daysLabel: '天数',
+    permissionDenied: '请在系统设置中开启通知权限',
+  },
+
   kitchenware: {
     title: '厨具设定',
     saveBtn: '保存设定',

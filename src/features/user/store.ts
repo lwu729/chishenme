@@ -29,6 +29,17 @@ function rowToPreference(row: any): UserPreference {
     preferredCookingMethods: JSON.parse(row.preferredCookingMethods ?? '[]'),
     preferredFlavors: JSON.parse(row.preferredFlavors ?? '[]'),
     activeBirdId: row.activeBirdId ?? null,
+    notificationsEnabled: (row.notificationsEnabled ?? 1) === 1,
+    notifyOnStatusChange: (row.notifyOnStatusChange ?? 1) === 1,
+    notifyOnExpired: (row.notifyOnExpired ?? 1) === 1,
+    notifyOnUrgent: (row.notifyOnUrgent ?? 1) === 1,
+    notifyOnWarning: (row.notifyOnWarning ?? 1) === 1,
+    notifyInactiveIngredientDays: row.notifyInactiveIngredientDays ?? 7,
+    notifyInactiveRecipeDays: row.notifyInactiveRecipeDays ?? 3,
+    notifyTimeStatusChange: row.notifyTimeStatusChange ?? '09:00',
+    notifyTimeExpired: row.notifyTimeExpired ?? '09:00',
+    notifyTimeDailyReminder: row.notifyTimeDailyReminder ?? '09:00',
+    notifyTimeInactive: row.notifyTimeInactive ?? '09:00',
   };
 }
 
@@ -67,6 +78,39 @@ export const useUserStore = create<UserStore>((set) => ({
       setClauses.push('activeBirdId = ?');
       values.push(updates.activeBirdId ?? null);
     }
+
+    const boolNotifFields: (keyof typeof updates)[] = [
+      'notificationsEnabled', 'notifyOnStatusChange', 'notifyOnExpired',
+      'notifyOnUrgent', 'notifyOnWarning',
+    ];
+    for (const field of boolNotifFields) {
+      if (field in updates) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field] ? 1 : 0);
+      }
+    }
+
+    const intNotifFields: (keyof typeof updates)[] = [
+      'notifyInactiveIngredientDays', 'notifyInactiveRecipeDays',
+    ];
+    for (const field of intNotifFields) {
+      if (field in updates) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field] as number);
+      }
+    }
+
+    const strNotifFields: (keyof typeof updates)[] = [
+      'notifyTimeStatusChange', 'notifyTimeExpired',
+      'notifyTimeDailyReminder', 'notifyTimeInactive',
+    ];
+    for (const field of strNotifFields) {
+      if (field in updates) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field] as string);
+      }
+    }
+
     if (setClauses.length === 0) return;
 
     values.push(1); // WHERE id = 1

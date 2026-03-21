@@ -66,18 +66,29 @@ export const CREATE_USER_EVENTS_TABLE = `
 
 export const CREATE_USER_PREFERENCES_TABLE = `
   CREATE TABLE IF NOT EXISTS user_preferences (
-    id                     INTEGER PRIMARY KEY DEFAULT 1,
-    cookingTools           TEXT    NOT NULL DEFAULT '[]',
-    cookingAppliances      TEXT    NOT NULL DEFAULT '[]',
-    knives                 TEXT    NOT NULL DEFAULT '[]',
-    assistiveTools         TEXT    NOT NULL DEFAULT '[]',
-    measuringTools         TEXT    NOT NULL DEFAULT '[]',
-    condiments             TEXT    NOT NULL DEFAULT '[]',
-    useImperialUnits       INTEGER NOT NULL DEFAULT 0,
-    preferredCuisines      TEXT    NOT NULL DEFAULT '[]',
-    preferredCookingMethods TEXT   NOT NULL DEFAULT '[]',
-    preferredFlavors       TEXT    NOT NULL DEFAULT '[]',
-    activeBirdId           TEXT
+    id                            INTEGER PRIMARY KEY DEFAULT 1,
+    cookingTools                  TEXT    NOT NULL DEFAULT '[]',
+    cookingAppliances             TEXT    NOT NULL DEFAULT '[]',
+    knives                        TEXT    NOT NULL DEFAULT '[]',
+    assistiveTools                TEXT    NOT NULL DEFAULT '[]',
+    measuringTools                TEXT    NOT NULL DEFAULT '[]',
+    condiments                    TEXT    NOT NULL DEFAULT '[]',
+    useImperialUnits              INTEGER NOT NULL DEFAULT 0,
+    preferredCuisines             TEXT    NOT NULL DEFAULT '[]',
+    preferredCookingMethods       TEXT    NOT NULL DEFAULT '[]',
+    preferredFlavors              TEXT    NOT NULL DEFAULT '[]',
+    activeBirdId                  TEXT,
+    notificationsEnabled          INTEGER NOT NULL DEFAULT 1,
+    notifyOnStatusChange          INTEGER NOT NULL DEFAULT 1,
+    notifyOnExpired               INTEGER NOT NULL DEFAULT 1,
+    notifyOnUrgent                INTEGER NOT NULL DEFAULT 1,
+    notifyOnWarning               INTEGER NOT NULL DEFAULT 1,
+    notifyInactiveIngredientDays  INTEGER NOT NULL DEFAULT 7,
+    notifyInactiveRecipeDays      INTEGER NOT NULL DEFAULT 3,
+    notifyTimeStatusChange        TEXT    NOT NULL DEFAULT '09:00',
+    notifyTimeExpired             TEXT    NOT NULL DEFAULT '09:00',
+    notifyTimeDailyReminder       TEXT    NOT NULL DEFAULT '09:00',
+    notifyTimeInactive            TEXT    NOT NULL DEFAULT '09:00'
   );
 `;
 
