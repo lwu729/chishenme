@@ -42,7 +42,6 @@ export default function SettingsScreen() {
   const [pickerField, setPickerField] = useState<
     'notifyTimeStatusChange' | 'notifyTimeExpired' | 'notifyTimeDailyReminder' | 'notifyTimeInactive'
   >('notifyTimeStatusChange');
-  const [pickerDate, setPickerDate] = useState(new Date());
   const [pendingDate, setPendingDate] = useState(new Date());
 
   async function handleLanguageChange(lang: 'zh' | 'en') {
@@ -51,7 +50,6 @@ export default function SettingsScreen() {
 
   function updatePref(changes: Parameters<typeof updateUserPreference>[0]) {
     updateUserPreference(changes);
-    // Re-read updated pref and reschedule
     setTimeout(() => {
       const { userPreference: pref, userEvent: evt } = useUserStore.getState();
       if (pref) {
@@ -63,7 +61,6 @@ export default function SettingsScreen() {
   function openTimePicker(field: typeof pickerField, currentTime: string) {
     const d = timeStringToDate(currentTime);
     setPickerField(field);
-    setPickerDate(d);
     setPendingDate(d);
     setPickerVisible(true);
   }
@@ -73,7 +70,6 @@ export default function SettingsScreen() {
     if (!date) return;
     setPendingDate(date);
     if (Platform.OS === 'android') {
-      // Android 没有内联 spinner，选完即确认
       updatePref({ [pickerField]: dateToTimeString(date) });
       setPickerVisible(false);
     }
@@ -91,6 +87,8 @@ export default function SettingsScreen() {
   if (!userPreference) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
 
   const notifEnabled = userPreference.notificationsEnabled;
+  const ingredientDays = userPreference.notifyInactiveIngredientDays;
+  const recipeDays = userPreference.notifyInactiveRecipeDays;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -235,14 +233,15 @@ export default function SettingsScreen() {
             {/* 子项四：未录入食材提醒 */}
             <InactiveRow
               enabled={notifEnabled}
-              isOn={userPreference.notifyInactiveIngredientDays > 0}
-              onToggle={(v) => updatePref({ notifyInactiveIngredientDays: v ? 7 : 0 })}
-              days={userPreference.notifyInactiveIngredientDays > 0 ? userPreference.notifyInactiveIngredientDays : 7}
+              isOn={ingredientDays > 0}
+              onToggle={(v) => updatePref({
+                notifyInactiveIngredientDays: v ? (ingredientDays > 0 ? ingredientDays : 7) : 0,
+              })}
+              days={ingredientDays > 0 ? ingredientDays : 7}
               onDaysChange={(d) => updatePref({ notifyInactiveIngredientDays: d })}
               title={t('notifications.inactiveIngredient')}
               subtitle={t('notifications.inactiveIngredientSub', {
-                days: userPreference.notifyInactiveIngredientDays > 0
-                  ? userPreference.notifyInactiveIngredientDays : 7,
+                days: ingredientDays > 0 ? ingredientDays : 7,
               })}
               timeLabel={t('notifications.timeLabel')}
               timeValue={userPreference.notifyTimeInactive}
@@ -254,14 +253,15 @@ export default function SettingsScreen() {
             {/* 子项五：未生成菜谱提醒 */}
             <InactiveRow
               enabled={notifEnabled}
-              isOn={userPreference.notifyInactiveRecipeDays > 0}
-              onToggle={(v) => updatePref({ notifyInactiveRecipeDays: v ? 3 : 0 })}
-              days={userPreference.notifyInactiveRecipeDays > 0 ? userPreference.notifyInactiveRecipeDays : 3}
+              isOn={recipeDays > 0}
+              onToggle={(v) => updatePref({
+                notifyInactiveRecipeDays: v ? (recipeDays > 0 ? recipeDays : 3) : 0,
+              })}
+              days={recipeDays > 0 ? recipeDays : 3}
               onDaysChange={(d) => updatePref({ notifyInactiveRecipeDays: d })}
               title={t('notifications.inactiveRecipe')}
               subtitle={t('notifications.inactiveRecipeSub', {
-                days: userPreference.notifyInactiveRecipeDays > 0
-                  ? userPreference.notifyInactiveRecipeDays : 3,
+                days: recipeDays > 0 ? recipeDays : 3,
               })}
               timeLabel={t('notifications.timeLabel')}
               timeValue={userPreference.notifyTimeInactive}
@@ -283,11 +283,11 @@ export default function SettingsScreen() {
             style={{ width: '100%' }}
           />
           <View style={styles.pickerBtnRow}>
-            <TouchableOpacity style={styles.pickerCancelBtn} onPress={handleTimeCancel}>
-              <Text style={styles.pickerCancelText}>{t('common.cancel')}</Text>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={handleTimeCancel}>
+              <Text style={styles.secondaryBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.pickerSaveBtn} onPress={handleTimeSave}>
-              <Text style={styles.pickerSaveText}>{t('common.save')}</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleTimeSave}>
+              <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -351,27 +351,71 @@ interface InactiveRowProps {
 }
 
 function InactiveRow({ enabled, isOn, onToggle, days, onDaysChange, title, subtitle, timeLabel, timeValue, onTimePress }: InactiveRowProps) {
+  const { t, i18n: { language } } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [draftDays, setDraftDays] = useState('');
   const active = enabled && isOn;
+
+  function handleSaveDays() {
+    const n = parseInt(draftDays, 10);
+    if (isNaN(n) || n < 1 || n > 30) {
+      Alert.alert(
+        '',
+        language === 'zh'
+          ? '请输入 1-30 之间的天数'
+          : 'Please enter a number between 1 and 30',
+      );
+      return;
+    }
+    onDaysChange(n);
+    setEditing(false);
+  }
+
+  function handleCancelDays() {
+    setEditing(false);
+  }
+
   return (
     <View style={styles.notifItem}>
       <View style={styles.notifLeft}>
         <Text style={[styles.notifTitle, !enabled && styles.textDisabled]}>{title}</Text>
-        <Text style={[styles.notifSub, !enabled && styles.textDisabled]}>{subtitle}</Text>
-        {active && (
-          <View style={styles.daysRow}>
+
+        {/* 副标题：实时反映已保存的天数 */}
+        {active && !editing ? (
+          <TouchableOpacity
+            onPress={() => { setDraftDays(String(days)); setEditing(true); }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.notifSub, styles.subtitleEditable]}>{subtitle}</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.notifSub, !enabled && styles.textDisabled]}>{subtitle}</Text>
+        )}
+
+        {/* 天数编辑区 */}
+        {active && editing && (
+          <View style={styles.daysEditBlock}>
             <TextInput
-              style={styles.daysInput}
+              style={styles.daysEditInput}
               keyboardType="number-pad"
-              value={String(days)}
-              onChangeText={(v) => {
-                const n = parseInt(v, 10);
-                if (!isNaN(n) && n >= 1 && n <= 30) onDaysChange(n);
-              }}
+              value={draftDays}
+              onChangeText={setDraftDays}
               maxLength={2}
+              autoFocus
+              selectTextOnFocus
             />
+            <View style={styles.daysEditBtns}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={handleCancelDays}>
+                <Text style={styles.secondaryBtnText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveDays}>
+                <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
+
       <View style={styles.notifRight}>
         <TouchableOpacity
           disabled={!active}
@@ -525,6 +569,11 @@ const styles = StyleSheet.create({
     color: '#AAAAAA',
     fontFamily: font.family,
   },
+  subtitleEditable: {
+    color: colors.g600,
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'dotted',
+  },
   textDisabled: {
     color: '#CCCCCC',
   },
@@ -580,24 +629,58 @@ const styles = StyleSheet.create({
   pillTextActive: {
     color: '#FFFFFF',
   },
-  daysRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Days inline editor
+  daysEditBlock: {
     marginTop: 8,
+    gap: 8,
   },
-  daysInput: {
-    width: 44,
-    height: 32,
+  daysEditInput: {
+    width: 64,
+    height: 36,
     borderRadius: radius.badge,
     backgroundColor: colors.g50,
     borderWidth: 1.5,
-    borderColor: colors.g100,
+    borderColor: colors.g400,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: font.medium,
     color: colors.g800,
     fontFamily: font.family,
   },
+  daysEditBtns: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  // Shared button styles (used by days editor and time picker)
+  primaryBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: radius.button,
+    backgroundColor: colors.g800,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 14,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: '#FFFFFF',
+  },
+  secondaryBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: radius.button,
+    backgroundColor: colors.g50,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.g100,
+  },
+  secondaryBtnText: {
+    fontSize: 14,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    color: colors.g600,
+  },
+  // Time picker panel
   pickerPanel: {
     backgroundColor: colors.backgroundCard,
     borderTopWidth: 1,
@@ -608,33 +691,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 24,
     gap: 12,
-  },
-  pickerCancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.button,
-    backgroundColor: colors.g50,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.g100,
-  },
-  pickerCancelText: {
-    fontSize: 15,
-    fontFamily: font.family,
-    fontWeight: font.medium,
-    color: colors.g600,
-  },
-  pickerSaveBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.button,
-    backgroundColor: colors.g800,
-    alignItems: 'center',
-  },
-  pickerSaveText: {
-    fontSize: 15,
-    fontFamily: font.family,
-    fontWeight: font.medium,
-    color: '#FFFFFF',
   },
 });
