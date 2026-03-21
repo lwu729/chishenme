@@ -18,11 +18,13 @@ export interface UserEvent {
 // ============ USER PREFERENCE ============
 export interface UserPreference {
   id: 1;
-  cookingTools: string[]; // 烹饪器具，如 ['电饭煲', '炒锅']
+  cookingTools: string[]; // 烹饪器具（旧字段，保留兼容）
+  cookingAppliances: string[]; // 烹饪器具，如 ['电饭煲', '炒锅']
   knives: string[]; // 刀具
   assistiveTools: string[]; // 辅助器具
   measuringTools: string[]; // 测量工具，如 ['厨房秤', '量杯']
   condiments: string[]; // 调料，如 ['酱油', '盐', '糖']
+  useImperialUnits: boolean; // true = 英制（oz/lb/cups），false = 公制（g/ml）
   // 菜谱生成偏好（作为 AI prompt 的默认条件）
   preferredCuisines: string[];
   preferredCookingMethods: string[];

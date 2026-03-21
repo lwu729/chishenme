@@ -57,4 +57,55 @@ export function initDatabase(): void {
   database.execSync(
     'UPDATE ingredients SET originalQuantity = quantity WHERE originalQuantity = 0',
   );
+
+  // 迁移：为已存在的数据库添加 cookingAppliances 列（如果尚不存在）
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN cookingAppliances TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  // 迁移：为已存在的数据库添加 useImperialUnits 列（如果尚不存在）
+  try {
+    database.execSync(
+      'ALTER TABLE user_preferences ADD COLUMN useImperialUnits INTEGER NOT NULL DEFAULT 0',
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  // 迁移：为已存在的数据库添加厨具相关列（如果尚不存在）
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN measuringTools TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN condiments TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN knives TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
+
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN assistiveTools TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch (_) {
+    // 列已存在，忽略
+  }
 }

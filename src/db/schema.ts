@@ -68,10 +68,12 @@ export const CREATE_USER_PREFERENCES_TABLE = `
   CREATE TABLE IF NOT EXISTS user_preferences (
     id                     INTEGER PRIMARY KEY DEFAULT 1,
     cookingTools           TEXT    NOT NULL DEFAULT '[]',
+    cookingAppliances      TEXT    NOT NULL DEFAULT '[]',
     knives                 TEXT    NOT NULL DEFAULT '[]',
     assistiveTools         TEXT    NOT NULL DEFAULT '[]',
     measuringTools         TEXT    NOT NULL DEFAULT '[]',
     condiments             TEXT    NOT NULL DEFAULT '[]',
+    useImperialUnits       INTEGER NOT NULL DEFAULT 0,
     preferredCuisines      TEXT    NOT NULL DEFAULT '[]',
     preferredCookingMethods TEXT   NOT NULL DEFAULT '[]',
     preferredFlavors       TEXT    NOT NULL DEFAULT '[]',

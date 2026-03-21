@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { colors, font, radius } from '../../src/constants/theme';
 import i18n from '../../src/i18n';
 import CustomScrollView from '../../src/components/CustomScrollView';
+import KitchenwareModal from '../../src/components/KitchenwareModal';
 import { useIngredientStore } from '../../src/features/ingredient/store';
 import { useRecipeStore, hasConditionsChanged } from '../../src/features/recipe/store';
 import { useUserStore } from '../../src/features/user/store';
@@ -46,10 +47,12 @@ function formatGenerationAgeLabel(
 const DEFAULT_PREFERENCE: UserPreference = {
   id: 1,
   cookingTools: [],
+  cookingAppliances: [],
   knives: [],
   assistiveTools: [],
   measuringTools: [],
   condiments: [],
+  useImperialUnits: false,
   preferredCuisines: [],
   preferredCookingMethods: [],
   preferredFlavors: [],
@@ -262,6 +265,7 @@ function RecipeCard({
 export default function RecipesScreen() {
   const { t } = useTranslation();
   const [showResults, setShowResults] = useState(false);
+  const [showKitchenware, setShowKitchenware] = useState(false);
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [methods, setMethods] = useState<string[]>([]);
   const [tastes, setTastes] = useState<string[]>([]);
@@ -346,6 +350,17 @@ export default function RecipesScreen() {
     }, [buildGenerationContext]),
   );
 
+  function doGenerate(context: ReturnType<typeof buildGenerationContext>) {
+    generateAndSetRecipes(context)
+      .then(() => {
+        userChoseFilterRef.current = false;
+        setShowResults(true);
+      })
+      .catch((e: any) => {
+        showToast(e?.message ?? t('recipes.generateFailed'), t('common.ok'));
+      });
+  }
+
   async function handleGenerate(force = false) {
     const context = buildGenerationContext();
     if (!force && currentRecipes.length > 0 && !hasConditionsChanged(context)) {
@@ -354,13 +369,33 @@ export default function RecipesScreen() {
       setShowResults(true);
       return;
     }
-    try {
-      await generateAndSetRecipes(context);
-      userChoseFilterRef.current = false;
-      setShowResults(true);
-    } catch (e: any) {
-      showToast(e?.message ?? t('recipes.generateFailed'), t('common.ok'));
+
+    // Pre-generation check: if kitchen setup is empty, prompt user
+    const pref = userPreference ?? DEFAULT_PREFERENCE;
+    const kitchenIsEmpty =
+      pref.cookingAppliances.length === 0 &&
+      pref.condiments.length === 0 &&
+      pref.measuringTools.length === 0;
+    if (kitchenIsEmpty) {
+      Alert.alert(
+        t('kitchenware.preGenerateTitle'),
+        t('kitchenware.preGenerateBody'),
+        [
+          {
+            text: t('kitchenware.preGenerateGoFill'),
+            onPress: () => setShowKitchenware(true),
+          },
+          {
+            text: t('kitchenware.preGenerateSkip'),
+            style: 'cancel',
+            onPress: () => doGenerate(context),
+          },
+        ],
+      );
+      return;
     }
+
+    doGenerate(context);
   }
 
   async function handleForceRegenerate() {
@@ -448,12 +483,13 @@ export default function RecipesScreen() {
   // ── 筛选页 ──
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <KitchenwareModal visible={showKitchenware} onClose={() => setShowKitchenware(false)} />
       <View style={styles.rfTopbar}>
         <View>
           <Text style={styles.rfTitle}>{t('recipes.filterTitle')}</Text>
           <Text style={styles.rfSub}>{t('recipes.filterSub')}</Text>
         </View>
-        <TouchableOpacity style={styles.kitBtn} onPress={() => showToast(t('recipes.kitchenwareComingSoon'), t('common.ok'))}>
+        <TouchableOpacity style={styles.kitBtn} onPress={() => setShowKitchenware(true)}>
           <Text style={styles.kitBtnText}>{t('recipes.kitchenware')}</Text>
         </TouchableOpacity>
       </View>

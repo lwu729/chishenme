@@ -18,7 +18,17 @@ export interface RecipeGenerationContext {
   relatedRecipeStep?: RecipeStep; // 做饭提示时传入当前步骤
 }
 
-function buildSystemPrompt(measuringToolsStr: string): string {
+function buildSystemPrompt(measuringToolsStr: string, useImperialUnits: boolean): string {
+  const hasTools = measuringToolsStr !== '无';
+  let unitRule: string;
+  if (!hasTools) {
+    unitRule = '用户没有量器，只能使用描述性单位：一碗、一杯、一把、一汤匙、一小撮、一个、一块、一片等，严禁使用克、毫升、g、ml、oz、lb、cups、tsp、tbsp 等精确单位';
+  } else if (useImperialUnits) {
+    unitRule = `用户使用英制单位，已有工具：${measuringToolsStr}。根据工具使用对应英制单位（有厨房秤→oz/lb，有量杯→cups，有量勺→tsp/tbsp）`;
+  } else {
+    unitRule = `用户使用公制单位，已有工具：${measuringToolsStr}。根据工具使用对应公制单位（有厨房秤→g/克，有量杯→ml/毫升，有量勺→茶匙/汤匙）`;
+  }
+
   return `你是一个中文菜谱生成助手。根据用户提供的冰箱食材和条件，生成适合的菜谱。
 严格只返回 JSON，不要任何额外文字或 markdown 代码块，格式如下：
 {
@@ -40,10 +50,7 @@ function buildSystemPrompt(measuringToolsStr: string): string {
 }
 注意：
 - 生成恰好 5 个菜谱
-- 所需食材的数量单位规则：
-  - 如果用户没有登记任何测量工具，请使用不需要量器的单位：一碗、一杯、一把、一汤匙、一小撮、一个、一块、一片等，严禁使用克、毫升、ml、g、kg 等需要测量工具的单位
-  - 如果用户登记了测量工具（如下方列出），可以使用对应的精确单位，例如有厨房秤则可用克/公克，有量杯则可用毫升/ml
-  - 用户已登记的测量工具：${measuringToolsStr}
+- 食材用量单位规则：${unitRule}
 - 步骤清晰，每步骤有具体操作说明
 - 严格输出 JSON，不要任何前缀或后缀文字`;
 }
@@ -55,9 +62,10 @@ export async function generateRecipes(context: RecipeGenerationContext): Promise
   const measuringToolsStr = context.userPreference.measuringTools?.length > 0
     ? context.userPreference.measuringTools.join('、')
     : '无';
+  const useImperialUnits = context.userPreference.useImperialUnits ?? false;
   const language = (i18n.language === 'en' ? 'en' : 'zh') as 'zh' | 'en';
   const prompt = buildPrompt(context, language);
-  const raw = await callClaude(prompt, buildSystemPrompt(measuringToolsStr));
+  const raw = await callClaude(prompt, buildSystemPrompt(measuringToolsStr, useImperialUnits));
 
   // 去掉可能的 markdown 代码块标记
   const cleaned = raw
@@ -139,7 +147,8 @@ function buildPrompt(ctx: RecipeGenerationContext, language: 'zh' | 'en'): strin
 
   const pref = ctx.userPreference;
   const prefLines: string[] = [];
-  if (pref.cookingTools?.length) prefLines.push(`- 可用烹饪工具：${pref.cookingTools.join('、')}`);
+  if (pref.cookingAppliances?.length) prefLines.push(`- 可用烹饪器具（只生成能用这些器具烹饪的菜谱）：${pref.cookingAppliances.join('、')}`);
+  else if (pref.cookingTools?.length) prefLines.push(`- 可用烹饪工具：${pref.cookingTools.join('、')}`);
   if (pref.condiments?.length) prefLines.push(`- 可用调料：${pref.condiments.join('、')}`);
   if (pref.preferredCuisines?.length && !ctx.selectedCuisines.length)
     prefLines.push(`- 偏好菜系：${pref.preferredCuisines.join('、')}`);

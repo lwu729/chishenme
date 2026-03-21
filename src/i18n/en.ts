@@ -143,6 +143,33 @@ const en = {
     zh: '中文',
     en: 'English',
   },
+
+  kitchenware: {
+    title: 'Kitchen Setup',
+    saveBtn: 'Save Settings',
+    savedToast: 'Saved ✓',
+    imperialLabel: 'Units',
+    metric: 'Metric (g / ml)',
+    imperial: 'Imperial (oz / cups)',
+    measuringToolsLabel: 'Measuring Tools',
+    cookingAppliancesLabel: 'Cooking Appliances',
+    condimentsLabel: 'Condiments',
+    knivesLabel: 'Knives',
+    assistiveToolsLabel: 'Assistive Tools',
+    addBtn: '+ Custom',
+    addPromptTitle: 'Add {{section}}',
+    addPromptMsg: 'Common options: {{presets}}',
+    addPromptPlaceholder: 'Enter name...',
+    preGenerateTitle: 'Kitchen setup incomplete',
+    preGenerateBody: 'Fill in your kitchen tools and condiments for more accurate recipes.',
+    preGenerateGoFill: 'Go Fill In',
+    preGenerateSkip: 'Generate Anyway',
+    measuringPresets: ['Kitchen Scale', 'Measuring Cups', 'Measuring Spoons', 'Meat Thermometer'],
+    cookingAppliancesPresets: ['Wok', 'Rice Cooker', 'Microwave', 'Oven', 'Air Fryer', 'Soup Pot', 'Induction Cooker', 'Steamer'],
+    condimentsPresets: ['Salt', 'Soy Sauce', 'Vinegar', 'Sugar', 'Cooking Wine', 'Oyster Sauce', 'Chili Sauce', 'Vegetable Oil', 'Olive Oil', 'Black Pepper', 'Cornstarch', 'Honey'],
+    knivesPresets: ["Chef's Knife", 'Paring Knife', 'Bread Knife', 'Kitchen Shears'],
+    assistivePresets: ['Cutting Board', 'Rolling Pin', 'Whisk', 'Strainer', 'Spatula', 'Ladle', 'Tongs', 'Steamer Rack'],
+  },
 } as const;
 
 export default en;

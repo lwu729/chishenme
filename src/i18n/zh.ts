@@ -143,6 +143,33 @@ const zh = {
     zh: '中文',
     en: 'English',
   },
+
+  kitchenware: {
+    title: '厨具设定',
+    saveBtn: '保存设定',
+    savedToast: '设定已保存 ✓',
+    imperialLabel: '计量单位',
+    metric: '公制（克 / 毫升）',
+    imperial: '英制（盎司 / 杯）',
+    measuringToolsLabel: '计量工具',
+    cookingAppliancesLabel: '烹饪器具',
+    condimentsLabel: '调料',
+    knivesLabel: '刀具',
+    assistiveToolsLabel: '辅助器具',
+    addBtn: '+ 自定义',
+    addPromptTitle: '添加{{section}}',
+    addPromptMsg: '常见选项：{{presets}}',
+    addPromptPlaceholder: '输入名称...',
+    preGenerateTitle: '还没填写厨具设定',
+    preGenerateBody: '填写你拥有的厨具和调料，让 AI 生成更精准的菜谱。',
+    preGenerateGoFill: '去填写',
+    preGenerateSkip: '直接生成',
+    measuringPresets: ['厨房秤', '量杯', '量勺', '食物温度计'],
+    cookingAppliancesPresets: ['炒锅', '电饭煲', '微波炉', '烤箱', '空气炸锅', '汤锅', '电磁炉', '蒸锅'],
+    condimentsPresets: ['盐', '酱油', '醋', '糖', '料酒', '蚝油', '辣椒酱', '植物油', '橄榄油', '胡椒粉', '淀粉', '蜂蜜'],
+    knivesPresets: ['菜刀', '水果刀', '面包刀', '厨房剪刀'],
+    assistivePresets: ['砧板', '擀面杖', '打蛋器', '漏勺', '锅铲', '汤勺', '夹子', '蒸屉'],
+  },
 } as const;
 
 export default zh;
