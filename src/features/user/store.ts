@@ -10,12 +10,16 @@ interface UserStore {
   userPreference: UserPreference | null;
 
   loadUserPreference: () => void;
+  loadUserEvent: () => void;
   updateUserPreference: (updates: Partial<Omit<UserPreference, 'id'>>) => void;
-  // TODO: loadUserEvent() — 从 SQLite 读取 id=1 的 user_events 行
-  // TODO: updateUserEvent(updates: Partial<Omit<UserEvent, 'id'>>) — 更新事件计数
-  // TODO: incrementMealsCooked() — 增加做饭计数，处理每日重置和 streak 逻辑
-  // TODO: incrementIngredientsLogged(count: number) — 增加食材录入计数
-  // TODO: checkAndResetDailyMeals() — 检查是否需要重置每日做饭计数（4:00am）
+  updateUserEvent: (updates: Partial<Pick<UserEvent,
+    'hasFinishedWarningIngredient' |
+    'hasFinishedUrgentIngredient' |
+    'hasFinishedFreshIngredient' |
+    'hasLetIngredientExpire'
+  >>) => void;
+  incrementIngredientsLogged: () => void;
+  incrementMealsCooked: () => void;
 }
 
 function rowToPreference(row: any): UserPreference {
@@ -32,6 +36,7 @@ function rowToPreference(row: any): UserPreference {
     preferredCookingMethods: JSON.parse(row.preferredCookingMethods ?? '[]'),
     preferredFlavors: JSON.parse(row.preferredFlavors ?? '[]'),
     activeBirdId: row.activeBirdId ?? null,
+    birdSelectionMode: (row.birdSelectionMode ?? 'manual') as 'manual' | 'auto',
     notificationsEnabled: (row.notificationsEnabled ?? 1) === 1,
     notifyOnStatusChange: (row.notifyOnStatusChange ?? 1) === 1,
     notifyOnExpired: (row.notifyOnExpired ?? 1) === 1,
@@ -52,6 +57,22 @@ function rowToPreference(row: any): UserPreference {
   };
 }
 
+function rowToEvent(row: any): UserEvent {
+  return {
+    id: 1,
+    totalIngredientsLogged: row.totalIngredientsLogged ?? 0,
+    totalMealsCooked: row.totalMealsCooked ?? 0,
+    dailyMealsCooked: row.dailyMealsCooked ?? 0,
+    dailyMealsCookedDate: row.dailyMealsCookedDate ?? '',
+    cookingStreakDays: row.cookingStreakDays ?? 0,
+    lastCookedDate: row.lastCookedDate ?? null,
+    hasFinishedWarningIngredient: (row.hasFinishedWarningIngredient ?? 0) === 1,
+    hasFinishedUrgentIngredient: (row.hasFinishedUrgentIngredient ?? 0) === 1,
+    hasFinishedFreshIngredient: (row.hasFinishedFreshIngredient ?? 0) === 1,
+    hasLetIngredientExpire: (row.hasLetIngredientExpire ?? 0) === 1,
+  };
+}
+
 export const useUserStore = create<UserStore>((set, get) => ({
   userEvent: null,
   userPreference: null,
@@ -61,6 +82,73 @@ export const useUserStore = create<UserStore>((set, get) => ({
     const row = db.getFirstSync<any>('SELECT * FROM user_preferences WHERE id = 1');
     if (!row) return;
     set({ userPreference: rowToPreference(row) });
+  },
+
+  loadUserEvent: () => {
+    const db = getDatabase();
+    const row = db.getFirstSync<any>('SELECT * FROM user_events WHERE id = 1');
+    if (!row) return;
+    set({ userEvent: rowToEvent(row) });
+  },
+
+  updateUserEvent: (updates) => {
+    const db = getDatabase();
+    const setClauses = Object.keys(updates).map(k => `${k} = ?`);
+    const values = [...Object.values(updates).map(v => (v ? 1 : 0)), 1];
+    db.runSync(`UPDATE user_events SET ${setClauses.join(', ')} WHERE id = 1`, values);
+    const row = db.getFirstSync<any>('SELECT * FROM user_events WHERE id = 1');
+    if (row) set({ userEvent: rowToEvent(row) });
+  },
+
+  incrementIngredientsLogged: () => {
+    const db = getDatabase();
+    db.runSync(
+      'UPDATE user_events SET totalIngredientsLogged = totalIngredientsLogged + 1 WHERE id = 1',
+    );
+    const row = db.getFirstSync<any>('SELECT * FROM user_events WHERE id = 1');
+    if (row) set({ userEvent: rowToEvent(row) });
+  },
+
+  incrementMealsCooked: () => {
+    const db = getDatabase();
+    const today = new Date().toISOString().split('T')[0];
+    const row = db.getFirstSync<any>('SELECT * FROM user_events WHERE id = 1');
+    if (!row) return;
+
+    const lastDate: string = row.dailyMealsCookedDate ?? '';
+    const lastCooked: string | null = row.lastCookedDate ?? null;
+    const prevStreak: number = row.cookingStreakDays ?? 0;
+
+    // Update daily count
+    const newDailyCount = lastDate === today ? (row.dailyMealsCooked ?? 0) + 1 : 1;
+
+    // Update streak
+    let newStreak = prevStreak;
+    if (lastCooked) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      if (lastCooked === yesterdayStr) {
+        newStreak = prevStreak + 1;
+      } else if (lastCooked !== today) {
+        newStreak = 1;
+      }
+    } else {
+      newStreak = 1;
+    }
+
+    db.runSync(
+      `UPDATE user_events SET
+        totalMealsCooked = totalMealsCooked + 1,
+        dailyMealsCooked = ?,
+        dailyMealsCookedDate = ?,
+        cookingStreakDays = ?,
+        lastCookedDate = ?
+       WHERE id = 1`,
+      [newDailyCount, today, newStreak, today],
+    );
+    const updated = db.getFirstSync<any>('SELECT * FROM user_events WHERE id = 1');
+    if (updated) set({ userEvent: rowToEvent(updated) });
   },
 
   updateUserPreference: (updates) => {
@@ -86,6 +174,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
     if ('activeBirdId' in updates) {
       setClauses.push('activeBirdId = ?');
       values.push(updates.activeBirdId ?? null);
+    }
+    if ('birdSelectionMode' in updates) {
+      setClauses.push('birdSelectionMode = ?');
+      values.push(updates.birdSelectionMode as string);
     }
 
     const boolNotifFields: (keyof typeof updates)[] = [

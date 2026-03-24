@@ -30,6 +30,7 @@ export interface UserPreference {
   preferredCookingMethods: string[];
   preferredFlavors: string[];
   activeBirdId: string | null; // 当前激活的小鸟伙伴 id
+  birdSelectionMode: 'manual' | 'auto'; // 手动选择 or 每天随机，默认 'manual'
 
   // 通知设置
   notificationsEnabled: boolean;        // 总开关，默认 true

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,21 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useRecipeStore } from '../src/features/recipe/store';
 import { useIngredientStore } from '../src/features/ingredient/store';
+import { useUserStore } from '../src/features/user/store';
+import { useBirdStore } from '../src/features/bird/store';
+import { checkAndUnlockBirds } from '../src/services/bird/unlockService';
+import { generateBirdCookingTip } from '../src/services/ai/birdMessage';
 import { colors, font, radius } from '../src/constants/theme';
 import { Recipe } from '../src/features/recipe/types';
+
+interface DeductionResult {
+  id: string;
+  name: string;
+  expiryStatus: string;
+  newQuantity: number;
+  newRemainingPercentage: number;
+  shouldDelete: boolean;
+}
 
 function showToast(msg: string, okText = 'OK') {
   if (Platform.OS === 'android') {
@@ -24,6 +37,47 @@ function showToast(msg: string, okText = 'OK') {
   } else {
     Alert.alert('', msg, [{ text: okText }]);
   }
+}
+
+function FinishedIngredientsModal({
+  visible,
+  ingredients,
+  onConfirm,
+}: {
+  visible: boolean;
+  ingredients: DeductionResult[];
+  onConfirm: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const isEn = i18n.language === 'en';
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalEmoji}>🎉</Text>
+          <Text style={styles.modalTitle}>
+            {isEn ? 'Ingredients Used Up 🎉' : '食材已用完 🎉'}
+          </Text>
+          <Text style={styles.finishedSub}>
+            {isEn
+              ? 'The following ingredients have been fully used and will be removed'
+              : '以下食材已全部使用，将从冰箱中移除'}
+          </Text>
+          <View style={styles.finishedList}>
+            {ingredients.map(ing => (
+              <View key={ing.id} style={styles.finishedRow}>
+                <Text style={styles.finishedName}>{ing.name}</Text>
+                <Text style={styles.finishedCheck}>{isEn ? '✓ Used up' : '✓ 已用完'}</Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity style={styles.modalBtn} onPress={onConfirm} activeOpacity={0.85}>
+            <Text style={styles.modalBtnText}>{isEn ? 'Confirm Remove' : '确认移除'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 // ─── 顶部栏 ───
@@ -88,21 +142,60 @@ function CompletionModal({
 
 // ─── 主页面 ───
 export default function RecipeDetailScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentRecipes, favoritedRecipes, toggleFavorite } = useRecipeStore();
   const { ingredients, loadIngredients } = useIngredientStore();
+  const { incrementMealsCooked } = useUserStore();
+  const { activeBird, getRandomGreeting, addPendingUnlock } = useBirdStore();
 
   const [view, setView] = useState<'detail' | 'steps'>('detail');
   const [currentStep, setCurrentStep] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [birdTips, setBirdTips] = useState<Record<number, string>>({});
+  const loadingSteps = useRef<Set<number>>(new Set());
+  const [finishedIngredients, setFinishedIngredients] = useState<DeductionResult[]>([]);
+  const [showFinishedModal, setShowFinishedModal] = useState(false);
+
+  const recipe: Recipe | undefined =
+    currentRecipes.find(r => r.id === id) ?? favoritedRecipes.find(r => r.id === id);
 
   useEffect(() => {
     loadIngredients();
   }, []);
 
-  const recipe: Recipe | undefined =
-    currentRecipes.find(r => r.id === id) ?? favoritedRecipes.find(r => r.id === id);
+  // 切换到步骤页时预加载第0步
+  useEffect(() => {
+    if (view === 'steps' && recipe) {
+      loadTipForStep(0, recipe);
+    }
+  }, [view]);
+
+  // 每到新步骤时预加载下一步
+  useEffect(() => {
+    if (view === 'steps' && recipe) {
+      loadTipForStep(currentStep + 1, recipe);
+    }
+  }, [currentStep]);
+
+  async function loadTipForStep(stepIndex: number, r: Recipe) {
+    if (birdTips[stepIndex] !== undefined || loadingSteps.current.has(stepIndex)) return;
+    const step = r.steps[stepIndex];
+    if (!step) return;
+    loadingSteps.current.add(stepIndex);
+    try {
+      const tip = await generateBirdCookingTip(
+        step.instruction,
+        activeBird?.personalityPrompt ?? '',
+        i18n.language as 'zh' | 'en',
+      );
+      setBirdTips(prev => ({ ...prev, [stepIndex]: tip }));
+    } catch {
+      setBirdTips(prev => ({ ...prev, [stepIndex]: getRandomGreeting() }));
+    } finally {
+      loadingSteps.current.delete(stepIndex);
+    }
+  }
 
   if (!recipe) {
     return (
@@ -216,6 +309,7 @@ export default function RecipeDetailScreen() {
             onPress={() => {
               setCurrentStep(0);
               setShowCompletion(false);
+              loadTipForStep(0, recipe);
               setView('steps');
             }}
             activeOpacity={0.85}
@@ -234,6 +328,86 @@ export default function RecipeDetailScreen() {
   const isLast = currentStep >= recipe.steps.length - 1;
   const stepNumStr = String(step?.stepNumber ?? currentStep + 1).padStart(2, '0');
   const totalSteps = recipe.steps.length;
+  const birdEmoji = activeBird?.emoji ?? '🐦';
+
+  function handleDone() {
+    // 1. 计算所有扣减结果
+    const { ingredients, updateIngredient } = useIngredientStore.getState();
+    const deductions: DeductionResult[] = [];
+
+    for (const recipeIng of recipe!.ingredients) {
+      const matches = ingredients
+        .filter(ing => ing.name === recipeIng.name && ing.remainingPercentage > 0)
+        .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+      if (matches.length === 0) continue;
+      const ing = matches[0];
+
+      const currentQuantity = ing.quantity * (ing.remainingPercentage / 100);
+      const afterQuantity = Math.max(0, currentQuantity - recipeIng.quantity);
+      const newRemainingPercentage = Math.round((afterQuantity / ing.originalQuantity) * 100);
+
+      deductions.push({
+        id: ing.id,
+        name: ing.name,
+        expiryStatus: ing.expiryStatus,
+        newQuantity: parseFloat(afterQuantity.toFixed(1)),
+        newRemainingPercentage,
+        shouldDelete: newRemainingPercentage <= 0,
+      });
+    }
+
+    // 2. 立刻更新不需要删除的食材
+    for (const d of deductions) {
+      if (!d.shouldDelete) {
+        updateIngredient(d.id, {
+          quantity: d.newQuantity,
+          remainingPercentage: d.newRemainingPercentage,
+        });
+      }
+    }
+
+    // 3. 记录 UserEvent boolean 状态（含待删除食材）
+    const { userEvent, updateUserEvent } = useUserStore.getState();
+    if (userEvent) {
+      for (const d of deductions) {
+        if (d.expiryStatus === 'warning' && !userEvent.hasFinishedWarningIngredient) {
+          updateUserEvent({ hasFinishedWarningIngredient: true });
+        }
+        if (d.expiryStatus === 'urgent' && !userEvent.hasFinishedUrgentIngredient) {
+          updateUserEvent({ hasFinishedUrgentIngredient: true });
+        }
+        if (d.expiryStatus === 'fresh' && !userEvent.hasFinishedFreshIngredient) {
+          updateUserEvent({ hasFinishedFreshIngredient: true });
+        }
+      }
+    }
+
+    // 4. 增加做饭次数 + 检查小鸟解锁
+    incrementMealsCooked();
+    const updatedEvent = useUserStore.getState().userEvent;
+    if (updatedEvent) {
+      const unlocked = checkAndUnlockBirds(updatedEvent);
+      unlocked.forEach(r => addPendingUnlock(r));
+    }
+
+    // 5. 有用完的食材 → 先弹确认弹窗；否则直接弹完成弹窗
+    const toDelete = deductions.filter(d => d.shouldDelete);
+    if (toDelete.length > 0) {
+      setFinishedIngredients(toDelete);
+      setShowFinishedModal(true);
+    } else {
+      setShowCompletion(true);
+    }
+  }
+
+  function handleFinishedConfirm() {
+    const { deleteIngredient } = useIngredientStore.getState();
+    for (const d of finishedIngredients) {
+      deleteIngredient(d.id);
+    }
+    setShowFinishedModal(false);
+    setShowCompletion(true);
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -276,11 +450,13 @@ export default function RecipeDetailScreen() {
         {/* 小鸟贴士 */}
         <View style={styles.birdRow}>
           <View style={styles.birdAvatar}>
-            <Text style={styles.birdEmoji}>🐦</Text>
+            <Text style={styles.birdEmoji}>{birdEmoji}</Text>
           </View>
           <View style={styles.birdTriangle} />
           <View style={styles.birdBubble}>
-            <Text style={styles.birdBubbleText}>{t('recipeDetail.birdTip')}</Text>
+            <Text style={styles.birdBubbleText}>
+              {birdTips[currentStep] ?? '…'}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -299,7 +475,7 @@ export default function RecipeDetailScreen() {
         {isLast ? (
           <TouchableOpacity
             style={[styles.primaryBtn, styles.doneBtn]}
-            onPress={() => setShowCompletion(true)}
+            onPress={handleDone}
             activeOpacity={0.85}
           >
             <Text style={styles.primaryBtnText}>{t('recipeDetail.done')}</Text>
@@ -315,6 +491,11 @@ export default function RecipeDetailScreen() {
         )}
       </View>
 
+      <FinishedIngredientsModal
+        visible={showFinishedModal}
+        ingredients={finishedIngredients}
+        onConfirm={handleFinishedConfirm}
+      />
       <CompletionModal
         visible={showCompletion}
         recipeName={recipe.name}
@@ -705,5 +886,36 @@ const styles = StyleSheet.create({
     fontWeight: font.medium,
     color: '#FFFFFF',
     fontFamily: font.family,
+  },
+  finishedSub: {
+    fontSize: 13,
+    color: '#AAAAAA',
+    fontFamily: font.family,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  finishedList: {
+    width: '100%',
+    marginBottom: 20,
+    gap: 8,
+  },
+  finishedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.g100,
+  },
+  finishedName: {
+    fontSize: 15,
+    color: colors.g800,
+    fontFamily: font.family,
+  },
+  finishedCheck: {
+    fontSize: 13,
+    color: colors.g600,
+    fontFamily: font.family,
+    fontWeight: font.medium,
   },
 });

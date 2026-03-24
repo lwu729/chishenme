@@ -164,6 +164,22 @@ const zh = {
     permissionDenied: '请在系统设置中开启通知权限',
   },
 
+  birdNest: {
+    title: '我的鸟窝',
+    myCompanions: '我的伙伴',
+    locked: '待解锁',
+    currentBadge: '当前伙伴',
+    setAsCurrent: '设为当前伙伴',
+    switched: '已切换到 {{name}}',
+    unlockedAt: '解锁于 {{date}}',
+    autoMode: '自动随机',
+    manualMode: '手动选择',
+    autoModeHint: '自动随机模式下无法手动选择',
+    unlockModalTitle: '新伙伴解锁！',
+    unlockModalSetNow: '设为当前伙伴',
+    unlockModalLater: '稍后再说',
+  },
+
   expirySettings: {
     title: '过期状态设置',
     subtitle: '调整食材过期状态的判定条件',

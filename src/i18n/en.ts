@@ -164,6 +164,22 @@ const en = {
     permissionDenied: 'Please enable notifications in system settings',
   },
 
+  birdNest: {
+    title: 'My Bird Nest',
+    myCompanions: 'My Companions',
+    locked: 'Locked',
+    currentBadge: 'Active',
+    setAsCurrent: 'Set as Companion',
+    switched: 'Switched to {{name}}',
+    unlockedAt: 'Unlocked on {{date}}',
+    autoMode: 'Auto Random',
+    manualMode: 'Manual',
+    autoModeHint: 'Switch to manual mode to choose a companion',
+    unlockModalTitle: 'New Companion Unlocked!',
+    unlockModalSetNow: 'Set as Current',
+    unlockModalLater: 'Maybe Later',
+  },
+
   expirySettings: {
     title: 'Expiry Status Settings',
     subtitle: 'Customize when ingredients are marked as expiring',

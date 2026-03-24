@@ -1,10 +1,13 @@
 import { create } from 'zustand';
+import * as FileSystem from 'expo-file-system';
 import { Ingredient, StorageLocation, IngredientFilterState } from './types';
 import { getDatabase } from '../../db/database';
 import { calculateExpiryStatus, calculateDaysUntilExpiry, DEFAULT_THRESHOLDS, ExpiryThresholds } from '../../utils/expiryUtils';
 import { useRecipeStore } from '../recipe/store';
 import { scheduleAllNotifications } from '../../services/notifications/notificationService';
 import { useUserStore } from '../user/store';
+import { useBirdStore } from '../bird/store';
+import { checkAndUnlockBirds } from '../../services/bird/unlockService';
 import i18n from '../../i18n';
 
 const EXPIRY_SORT_ORDER: Record<string, number> = {
@@ -69,6 +72,40 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     });
 
     set({ ingredients });
+
+    // 异步验证绝对路径是否仍然有效（iOS 沙盒路径重启后可能变化）
+    (async () => {
+      for (const ing of ingredients) {
+        if (!ing.imagePath) continue;
+        const isAbsolute = ing.imagePath.startsWith('file://') || ing.imagePath.startsWith('/var/mobile') || ing.imagePath.startsWith('/private/var');
+        if (!isAbsolute) continue;
+        try {
+          const info = await FileSystem.getInfoAsync(ing.imagePath);
+          if (!info.exists) {
+            db.runSync('UPDATE ingredients SET imagePath = NULL WHERE id = ?', [ing.id]);
+          }
+        } catch {
+          db.runSync('UPDATE ingredients SET imagePath = NULL WHERE id = ?', [ing.id]);
+        }
+      }
+      // 如果有路径失效，重新加载（不递归触发路径检查）
+      const updated = db.getAllSync<Ingredient & { imageCrop: string | null }>('SELECT * FROM ingredients');
+      const hasChange = updated.some((r, i) => r.imagePath !== ingredients[i]?.imagePath);
+      if (hasChange) {
+        const fixed = updated.map(row => {
+          const days = calculateDaysUntilExpiry(row.expiryDate);
+          const status = calculateExpiryStatus(days, row.remainingPercentage, thresholds);
+          let imageCrop: Ingredient['imageCrop'] = null;
+          try { if (row.imageCrop) imageCrop = JSON.parse(row.imageCrop); } catch (_) {}
+          return { ...row, daysUntilExpiry: days, expiryStatus: status, imageCrop };
+        });
+        fixed.sort((a, b) => {
+          const diff = EXPIRY_SORT_ORDER[a.expiryStatus] - EXPIRY_SORT_ORDER[b.expiryStatus];
+          return diff !== 0 ? diff : a.daysUntilExpiry - b.daysUntilExpiry;
+        });
+        set({ ingredients: fixed });
+      }
+    })();
   },
 
   addIngredient: (input) => {
@@ -112,6 +149,13 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     if (userPreference) {
       scheduleAllNotifications(ingredients, userPreference, userEvent, i18n.language as 'zh' | 'en');
     }
+    // 统计食材录入数并检测小鸟解锁
+    useUserStore.getState().incrementIngredientsLogged();
+    const updatedEvent = useUserStore.getState().userEvent;
+    if (updatedEvent) {
+      const unlocked = checkAndUnlockBirds(updatedEvent);
+      unlocked.forEach(r => useBirdStore.getState().addPendingUnlock(r));
+    }
   },
 
   updateIngredient: (id, updates) => {
@@ -131,6 +175,14 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     get().loadIngredients();
     if (updates.quantity !== undefined) {
       useRecipeStore.getState().invalidateCache();
+    }
+    // 食材消耗完时检测小鸟解锁
+    if (updates.remainingPercentage === 0) {
+      const { userEvent } = useUserStore.getState();
+      if (userEvent) {
+        const unlocked = checkAndUnlockBirds(userEvent);
+        unlocked.forEach(r => useBirdStore.getState().addPendingUnlock(r));
+      }
     }
   },
 

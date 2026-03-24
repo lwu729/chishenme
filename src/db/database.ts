@@ -9,6 +9,7 @@ import {
   INSERT_DEFAULT_USER_EVENT,
   INSERT_DEFAULT_USER_PREFERENCE,
 } from './schema';
+import { BIRDS_DATA } from '../data/birds';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -165,6 +166,49 @@ export function initDatabase(): void {
       "ALTER TABLE user_preferences ADD COLUMN notifyTimeInactive TEXT NOT NULL DEFAULT '09:00'",
     );
   } catch (_) {}
+
+  // 迁移：birdSelectionMode 字段
+  try {
+    database.execSync(
+      "ALTER TABLE user_preferences ADD COLUMN birdSelectionMode TEXT NOT NULL DEFAULT 'manual'",
+    );
+  } catch (_) {}
+
+  // 初始化小鸟数据（INSERT OR IGNORE 防重复）
+  for (const bird of BIRDS_DATA) {
+    const existing = database.getFirstSync<{ id: string }>(
+      'SELECT id FROM bird_companions WHERE id = ?',
+      [bird.id],
+    );
+    if (!existing) {
+      database.runSync(
+        `INSERT INTO bird_companions
+           (id, name, unlockTriggerType, unlockTriggerValue, personalityDescription, isUnlocked, unlockedAt, imagePath)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          bird.id,
+          bird.nameZh,
+          bird.unlockTriggerType,
+          bird.unlockTriggerDescription,
+          bird.personalityPrompt,
+          bird.isDefault ? 1 : 0,
+          bird.isDefault ? new Date().toISOString() : null,
+          bird.imagePath,
+        ],
+      );
+    }
+  }
+
+  // 如果 activeBirdId 还没设，默认设为夜鹭
+  const pref = database.getFirstSync<{ activeBirdId: string | null }>(
+    'SELECT activeBirdId FROM user_preferences WHERE id = 1',
+  );
+  if (pref && !pref.activeBirdId) {
+    database.runSync(
+      'UPDATE user_preferences SET activeBirdId = ? WHERE id = 1',
+      ['night-heron'],
+    );
+  }
 
   // 迁移：过期状态阈值字段
   try {

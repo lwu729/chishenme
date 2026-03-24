@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
 import { useIngredientStore } from '../../src/features/ingredient/store';
+import { useBirdStore } from '../../src/features/bird/store';
 import { colors, font, radius } from '../../src/constants/theme';
 import CustomScrollView from '../../src/components/CustomScrollView';
 
@@ -91,6 +92,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { ingredients, loadIngredients } = useIngredientStore();
+  const { activeBird, getRandomGreeting } = useBirdStore();
+
+  const birdEmoji = activeBird?.emoji ?? '🐦';
+  const birdGreeting = activeBird ? getRandomGreeting() : t('home.birdQuestion');
 
   useEffect(() => {
     loadIngredients();
@@ -109,17 +114,19 @@ export default function HomeScreen() {
       {/* 小鸟区域 */}
       <View style={[styles.birdSection, { height: BIRD_SECTION_H }]}>
         <View style={[styles.birdOuter, { width: BIRD_SIZE, height: BIRD_SIZE }]}>
-          <View
+          <TouchableOpacity
+            onPress={() => router.push('/bird-nest' as any)}
+            activeOpacity={0.85}
             style={[
               styles.birdCircle,
               { width: BIRD_SIZE, height: BIRD_SIZE, borderRadius: BIRD_SIZE / 2 },
             ]}
           >
-            <Text style={[styles.birdEmoji, { fontSize: BIRD_SIZE * 0.44 }]}>🐦</Text>
-          </View>
+            <Text style={[styles.birdEmoji, { fontSize: BIRD_SIZE * 0.44 }]}>{birdEmoji}</Text>
+          </TouchableOpacity>
           <View style={styles.bubble}>
             <View style={styles.bubbleArrow} />
-            <Text style={styles.bubbleText}>{t('home.birdQuestion')}</Text>
+            <Text style={styles.bubbleText}>{birdGreeting}</Text>
           </View>
         </View>
         <Text style={styles.birdLabel}>{t('home.birdLabel')}</Text>

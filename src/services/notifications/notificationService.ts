@@ -1,11 +1,14 @@
 import * as Notifications from 'expo-notifications';
 import { Ingredient, ExpiryStatus } from '../../features/ingredient/types';
 import { UserPreference, UserEvent } from '../../features/user/types';
+import { useBirdStore } from '../../features/bird/store';
 
 // app 在前台时也显示通知
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -62,9 +65,7 @@ export async function scheduleAllNotifications(
           identifier: `status-change-${ing.id}`,
           content: {
             title: isEn ? '🧊 Ingredient Status Changed' : '🧊 食材状态变化',
-            body: isEn
-              ? `${ing.name} is now ${ing.expiryStatus === ExpiryStatus.WARNING ? 'expiring soon' : 'expiring very soon'}!`
-              : `${ing.name} 现在处于${ing.expiryStatus === ExpiryStatus.WARNING ? '快过期' : '即将过期'}状态！`,
+            body: useBirdStore.getState().getExpiryAlert(ing.name),
           },
           trigger: { type: 'date', date: triggerDate } as any,
         });
@@ -128,9 +129,7 @@ export async function scheduleAllNotifications(
         identifier: 'inactive-ingredient',
         content: {
           title: isEn ? '📦 Time to Restock?' : '📦 该补充食材了？',
-          body: isEn
-            ? `You haven't added ingredients in ${daysSinceLog} days!`
-            : `你已经 ${daysSinceLog} 天没有录入食材了！`,
+          body: useBirdStore.getState().getInactiveAlert(daysSinceLog),
         },
         trigger: { type: 'date', date: nextOccurrence(hour, minute) } as any,
       });

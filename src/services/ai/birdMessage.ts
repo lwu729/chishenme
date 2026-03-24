@@ -1,24 +1,25 @@
-import { BirdCompanion } from '../../features/bird/types';
-import { UserEvent } from '../../features/user/types';
-import { Ingredient } from '../../features/ingredient/types';
-import { RecipeStep } from '../../features/recipe/types';
-
-export interface BirdMessageContext {
-  bird: BirdCompanion;
-  userEvent: UserEvent;
-  relatedIngredients?: Ingredient[]; // 与消息相关的食材（如过期提醒）
-  relatedRecipeStep?: RecipeStep; // 与消息相关的菜谱步骤
-}
+import { callClaude } from './claudeClient';
 
 /**
- * 以小鸟伙伴的风格生成消息文本（过期提醒、做饭鼓励、解锁庆祝等）。
- * @param context - 包含小鸟信息、用户状态及相关上下文
+ * 根据当前步骤和小鸟性格，用 AI 实时生成一条烹饪小贴士。
  */
-export async function generateBirdMessage(context: BirdMessageContext): Promise<string> {
-  // TODO: 实现小鸟消息生成
-  // - 从 context.bird.personalityDescription 提取风格描述注入 system prompt
-  // - 根据 context.relatedIngredients 生成过期提醒消息
-  // - 根据 context.relatedRecipeStep 生成做饭步骤提示消息
-  // - 调用 callClaude，返回纯文本消息字符串
-  throw new Error('TODO: generateBirdMessage not implemented');
+export async function generateBirdCookingTip(
+  stepDescription: string,
+  birdPersonalityPrompt: string,
+  language: 'zh' | 'en',
+): Promise<string> {
+  let prompt: string;
+
+  if (language === 'en') {
+    prompt = `You are a bird companion in a cooking app. Your personality: ${birdPersonalityPrompt}
+The user is on this cooking step: "${stepDescription}"
+Give ONE short cooking tip related to this step, in your personality's voice.
+Max 2 sentences. English only. No quotation marks.`;
+  } else {
+    prompt = `你是一个烹饪 app 里的小鸟伙伴。你的性格：${birdPersonalityPrompt}
+用户正在进行这个步骤：「${stepDescription}」
+用你的性格语气给出一条和这个步骤相关的简短烹饪小贴士。最多两句话。只用中文。不加引号。`;
+  }
+
+  return callClaude(prompt);
 }
