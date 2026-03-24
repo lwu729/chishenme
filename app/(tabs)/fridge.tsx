@@ -84,12 +84,15 @@ function EditModal({
   item,
   onClose,
   onSave,
+  onDelete,
 }: {
   item: Ingredient;
   onClose: () => void;
   onSave: (id: string, quantity: number, remainingPercentage: number, imagePath: string | null) => void;
+  onDelete: (id: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isEn = i18n.language === 'en';
   const max = item.originalQuantity;
   const [quantity, setQuantity] = useState(item.quantity);
   const [quantityText, setQuantityText] = useState(String(item.quantity));
@@ -144,7 +147,27 @@ function EditModal({
   }
 
   function handleSave() {
-    if (quantity <= 0) { showToast(t('fridge.quantityNotZero'), t('common.ok')); return; }
+    if (quantity <= 0) {
+      Alert.alert(
+        t('fridge.deleteTitle'),
+        isEn
+          ? `"${item.name}" quantity is 0. Remove it from your fridge?`
+          : `「${item.name}」数量为 0，要从冰箱中移除吗？`,
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('fridge.deleteConfirm'),
+            style: 'destructive',
+            onPress: () => {
+              onDelete(item.id);
+              onClose();
+              showToast(isEn ? `"${item.name}" removed ✓` : `「${item.name}」已移除 ✓`);
+            },
+          },
+        ]
+      );
+      return;
+    }
     const remaining = Math.round((quantity / max) * 100);
     onSave(item.id, quantity, remaining, imageUri);
   }
@@ -449,6 +472,7 @@ export default function FridgeScreen() {
           item={editingItem}
           onClose={() => setEditingItem(null)}
           onSave={handleSaveEdit}
+          onDelete={(id) => { deleteIngredient(id); setEditingItem(null); }}
         />
       )}
     </SafeAreaView>

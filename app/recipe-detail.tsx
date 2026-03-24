@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -153,7 +153,7 @@ export default function RecipeDetailScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
   const [birdTips, setBirdTips] = useState<Record<number, string>>({});
-  const loadingSteps = useRef<Set<number>>(new Set());
+  const [tipsLoading, setTipsLoading] = useState(false);
   const [finishedIngredients, setFinishedIngredients] = useState<DeductionResult[]>([]);
   const [showFinishedModal, setShowFinishedModal] = useState(false);
 
@@ -164,37 +164,30 @@ export default function RecipeDetailScreen() {
     loadIngredients();
   }, []);
 
-  // 切换到步骤页时预加载第0步
-  useEffect(() => {
-    if (view === 'steps' && recipe) {
-      loadTipForStep(0, recipe);
-    }
-  }, [view]);
-
-  // 每到新步骤时预加载下一步
-  useEffect(() => {
-    if (view === 'steps' && recipe) {
-      loadTipForStep(currentStep + 1, recipe);
-    }
-  }, [currentStep]);
-
-  async function loadTipForStep(stepIndex: number, r: Recipe) {
-    if (birdTips[stepIndex] !== undefined || loadingSteps.current.has(stepIndex)) return;
-    const step = r.steps[stepIndex];
-    if (!step) return;
-    loadingSteps.current.add(stepIndex);
-    try {
-      const tip = await generateBirdCookingTip(
-        step.instruction,
-        activeBird?.personalityPrompt ?? '',
-        i18n.language as 'zh' | 'en',
-      );
-      setBirdTips(prev => ({ ...prev, [stepIndex]: tip }));
-    } catch {
-      setBirdTips(prev => ({ ...prev, [stepIndex]: getRandomGreeting() }));
-    } finally {
-      loadingSteps.current.delete(stepIndex);
-    }
+  async function preloadAllTips() {
+    if (!recipe || !activeBird) return;
+    if (Object.keys(birdTips).length > 0) return;
+    setTipsLoading(true);
+    const results = await Promise.allSettled(
+      recipe.steps.map((step, index) =>
+        generateBirdCookingTip(
+          step.instruction,
+          activeBird.personalityPrompt,
+          i18n.language as 'zh' | 'en',
+        ).then(tip => ({ index, tip }))
+      )
+    );
+    const newTips: Record<number, string> = {};
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        newTips[result.value.index] = result.value.tip;
+      }
+    });
+    recipe.steps.forEach((_, index) => {
+      if (!newTips[index]) newTips[index] = getRandomGreeting();
+    });
+    setBirdTips(newTips);
+    setTipsLoading(false);
   }
 
   if (!recipe) {
@@ -307,9 +300,9 @@ export default function RecipeDetailScreen() {
           <TouchableOpacity
             style={styles.primaryBtn}
             onPress={() => {
+              preloadAllTips();
               setCurrentStep(0);
               setShowCompletion(false);
-              loadTipForStep(0, recipe);
               setView('steps');
             }}
             activeOpacity={0.85}
@@ -345,14 +338,15 @@ export default function RecipeDetailScreen() {
       const currentQuantity = ing.quantity * (ing.remainingPercentage / 100);
       const afterQuantity = Math.max(0, currentQuantity - recipeIng.quantity);
       const newRemainingPercentage = Math.round((afterQuantity / ing.originalQuantity) * 100);
+      const newQuantity = parseFloat(afterQuantity.toFixed(1));
 
       deductions.push({
         id: ing.id,
         name: ing.name,
         expiryStatus: ing.expiryStatus,
-        newQuantity: parseFloat(afterQuantity.toFixed(1)),
+        newQuantity,
         newRemainingPercentage,
-        shouldDelete: newRemainingPercentage <= 0,
+        shouldDelete: newRemainingPercentage <= 0 || newQuantity <= 0,
       });
     }
 
@@ -366,10 +360,10 @@ export default function RecipeDetailScreen() {
       }
     }
 
-    // 3. 记录 UserEvent boolean 状态（含待删除食材）
+    // 3. 记录 UserEvent boolean 状态（仅非删除食材）
     const { userEvent, updateUserEvent } = useUserStore.getState();
     if (userEvent) {
-      for (const d of deductions) {
+      for (const d of deductions.filter(d => !d.shouldDelete)) {
         if (d.expiryStatus === 'warning' && !userEvent.hasFinishedWarningIngredient) {
           updateUserEvent({ hasFinishedWarningIngredient: true });
         }
@@ -407,6 +401,21 @@ export default function RecipeDetailScreen() {
     const { deleteIngredient } = useIngredientStore.getState();
     for (const d of finishedIngredients) {
       deleteIngredient(d.id);
+    }
+    // 用完食材的 UserEvent 状态在此更新
+    const { userEvent, updateUserEvent } = useUserStore.getState();
+    if (userEvent) {
+      for (const d of finishedIngredients) {
+        if (d.expiryStatus === 'warning' && !userEvent.hasFinishedWarningIngredient) {
+          updateUserEvent({ hasFinishedWarningIngredient: true });
+        }
+        if (d.expiryStatus === 'urgent' && !userEvent.hasFinishedUrgentIngredient) {
+          updateUserEvent({ hasFinishedUrgentIngredient: true });
+        }
+        if (d.expiryStatus === 'fresh' && !userEvent.hasFinishedFreshIngredient) {
+          updateUserEvent({ hasFinishedFreshIngredient: true });
+        }
+      }
     }
     setShowFinishedModal(false);
     setShowCompletion(true);
