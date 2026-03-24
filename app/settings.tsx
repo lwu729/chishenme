@@ -13,7 +13,9 @@ import { colors, font, radius } from '../src/constants/theme';
 import { DEFAULT_THRESHOLDS } from '../src/utils/expiryUtils';
 import { useUserStore } from '../src/features/user/store';
 import { useIngredientStore } from '../src/features/ingredient/store';
+import { useBirdStore } from '../src/features/bird/store';
 import { scheduleAllNotifications } from '../src/services/notifications/notificationService';
+import { getDatabase, initDatabase } from '../src/db/database';
 import i18n from '../src/i18n';
 
 function timeStringToDate(timeStr: string): Date {
@@ -402,6 +404,50 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        {/* 开发者重置按钮 */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devResetBtn}
+            onPress={() => {
+              Alert.alert(
+                '重置所有数据',
+                '确定要清空所有食材、菜谱、小鸟解锁记录和使用记录吗？此操作不可恢复。',
+                [
+                  { text: '取消', style: 'cancel' },
+                  {
+                    text: '确认重置',
+                    style: 'destructive',
+                    onPress: () => {
+                      const db = getDatabase();
+                      db.runSync('DELETE FROM ingredients');
+                      db.runSync('DELETE FROM recipes');
+                      db.runSync('DELETE FROM bird_companions');
+                      db.runSync(`UPDATE user_events SET
+                        totalIngredientsLogged=0, totalMealsCooked=0,
+                        dailyMealsCooked=0, dailyMealsCookedDate='',
+                        cookingStreakDays=0, lastCookedDate=NULL,
+                        hasFinishedWarningIngredient=0,
+                        hasFinishedUrgentIngredient=0,
+                        hasFinishedFreshIngredient=0,
+                        hasLetIngredientExpire=0
+                        WHERE id=1`);
+                      db.runSync(`UPDATE user_preferences SET activeBirdId='night-heron' WHERE id=1`);
+                      initDatabase();
+                      useIngredientStore.getState().loadIngredients();
+                      useBirdStore.getState().loadBirds();
+                      useUserStore.getState().loadUserEvent();
+                      useUserStore.getState().loadUserPreference();
+                      Alert.alert('✓', '数据已重置');
+                      router.replace('/(tabs)');
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.devResetText}>🛠 重置所有数据（开发模式）</Text>
+          </TouchableOpacity>
+        )}
       </KeyboardAwareScrollView>
 
       {/* DateTimePicker with Save / Cancel (iOS only; Android auto-confirms) */}
@@ -975,5 +1021,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 24,
     gap: 12,
+  },
+  devResetBtn: {
+    marginTop: 32,
+    marginHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: radius.button,
+    borderWidth: 1.5,
+    borderColor: colors.red,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  devResetText: {
+    fontSize: 14,
+    color: colors.red,
+    fontFamily: font.family,
+    textAlign: 'center',
   },
 });

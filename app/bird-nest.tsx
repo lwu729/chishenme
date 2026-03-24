@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ToastAndroid, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { colors, font, radius } from '../src/constants/theme';
 import { useBirdStore } from '../src/features/bird/store';
@@ -14,6 +16,12 @@ export default function BirdNestScreen() {
 
   const { birds, activeBird, setActiveBird } = useBirdStore();
   const { userPreference, updateUserPreference } = useUserStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      useBirdStore.getState().loadBirds();
+    }, [])
+  );
 
   const isAutoMode = userPreference?.birdSelectionMode === 'auto';
 

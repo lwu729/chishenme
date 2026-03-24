@@ -7,7 +7,7 @@ import { scheduleAllNotifications } from '../src/services/notifications/notifica
 import { useIngredientStore } from '../src/features/ingredient/store';
 import { useUserStore } from '../src/features/user/store';
 import { useBirdStore } from '../src/features/bird/store';
-import { UnlockResult } from '../src/services/bird/unlockService';
+import { UnlockResult, checkAndUnlockBirds } from '../src/services/bird/unlockService';
 import BirdUnlockModal from '../src/components/BirdUnlockModal';
 import i18n from '../src/i18n';
 
@@ -43,6 +43,26 @@ export default function RootLayout() {
         scheduleAllNotifications(ingredients, userPreference, userEvent, i18n.language as 'zh' | 'en');
       }
     }, 1500);
+    // 检查是否有食材已过期但未用完（触发企鹅解锁条件）
+    setTimeout(() => {
+      const { ingredients } = useIngredientStore.getState();
+      const { userEvent, updateUserEvent } = useUserStore.getState();
+      if (
+        userEvent &&
+        !userEvent.hasLetIngredientExpire &&
+        ingredients.some(ing => ing.expiryStatus === 'expired' && ing.remainingPercentage > 0)
+      ) {
+        updateUserEvent({ hasLetIngredientExpire: true });
+        const updated = useUserStore.getState().userEvent;
+        if (updated) {
+          const unlocked = checkAndUnlockBirds(updated);
+          if (unlocked.length > 0) {
+            useBirdStore.getState().loadBirds();
+            unlocked.forEach(r => useBirdStore.getState().addPendingUnlock(r));
+          }
+        }
+      }
+    }, 2000);
   }, [ready]);
 
   // 当没有正在显示的弹窗且队列有新项目时，取出第一个展示

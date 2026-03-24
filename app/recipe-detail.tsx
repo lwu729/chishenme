@@ -387,7 +387,10 @@ export default function RecipeDetailScreen() {
     const updatedEvent = useUserStore.getState().userEvent;
     if (updatedEvent) {
       const unlocked = checkAndUnlockBirds(updatedEvent);
-      unlocked.forEach(r => addPendingUnlock(r));
+      if (unlocked.length > 0) {
+        useBirdStore.getState().loadBirds();
+        unlocked.forEach(r => addPendingUnlock(r));
+      }
     }
 
     // 5. 有用完的食材 → 先弹确认弹窗；否则直接弹完成弹窗
