@@ -27,9 +27,8 @@ function showToast(msg: string, okText = 'OK') {
   }
 }
 
-const { width: SW, height: SH } = Dimensions.get('window');
-const BIRD_SIZE = Math.min(200, SW * 0.5);
-const BIRD_SECTION_H = Math.min(270, SH * 0.32);
+const { width: SW } = Dimensions.get('window');
+const BIRD_SIZE = Math.min(160, SW * 0.42);
 
 // 根据食材名推导展示用 emoji
 const EMOJI_MAP: Record<string, string> = {
@@ -112,24 +111,29 @@ export default function HomeScreen() {
       </View>
 
       {/* 小鸟区域 */}
-      <View style={[styles.birdSection, { height: BIRD_SECTION_H }]}>
-        <View style={[styles.birdOuter, { width: BIRD_SIZE, height: BIRD_SIZE }]}>
-          <TouchableOpacity
-            onPress={() => router.push('/bird-nest' as any)}
-            activeOpacity={0.85}
-            style={[
-              styles.birdCircle,
-              { width: BIRD_SIZE, height: BIRD_SIZE, borderRadius: BIRD_SIZE / 2 },
-            ]}
-          >
+      <View style={styles.birdSection}>
+        <TouchableOpacity
+          onPress={() => router.push('/bird-nest' as any)}
+          activeOpacity={0.85}
+          style={[
+            styles.birdCircle,
+            { width: BIRD_SIZE, height: BIRD_SIZE, borderRadius: BIRD_SIZE / 2 },
+          ]}
+        >
+          {activeBird?.fullImagePath ? (
+            <Image
+              source={activeBird.fullImagePath}
+              style={{ width: BIRD_SIZE * 0.85, height: BIRD_SIZE * 0.85 }}
+              resizeMode="contain"
+            />
+          ) : (
             <Text style={[styles.birdEmoji, { fontSize: BIRD_SIZE * 0.44 }]}>{birdEmoji}</Text>
-          </TouchableOpacity>
-          <View style={styles.bubble}>
-            <View style={styles.bubbleArrow} />
-            <Text style={styles.bubbleText}>{birdGreeting}</Text>
-          </View>
-        </View>
+          )}
+        </TouchableOpacity>
         <Text style={styles.birdLabel}>{t('home.birdLabel')}</Text>
+        <View style={styles.greetingBubble}>
+          <Text style={styles.greetingText}>{birdGreeting}</Text>
+        </View>
       </View>
 
       {/* 食材列表 */}
@@ -183,9 +187,8 @@ const styles = StyleSheet.create({
   birdSection: {
     flexShrink: 0,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 16,
   },
-  birdOuter: { position: 'relative' },
   birdCircle: {
     backgroundColor: colors.g100,
     alignItems: 'center',
@@ -194,34 +197,22 @@ const styles = StyleSheet.create({
     borderColor: colors.g200,
   },
   birdEmoji: {},
-  bubble: {
-    position: 'absolute',
-    top: 20,
-    right: -95,
+  greetingBubble: {
     backgroundColor: colors.g800,
     borderRadius: 14,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 4,
+    maxWidth: 280,
+    alignSelf: 'center',
   },
-  bubbleArrow: {
-    position: 'absolute',
-    left: -7,
-    top: '50%',
-    marginTop: -7,
-    width: 0,
-    height: 0,
-    borderTopWidth: 7,
-    borderBottomWidth: 7,
-    borderRightWidth: 7,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderRightColor: colors.g800,
-  },
-  bubbleText: {
+  greetingText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontFamily: font.family,
     fontWeight: font.medium,
+    textAlign: 'center',
   },
   birdLabel: {
     fontSize: 14,
@@ -233,6 +224,7 @@ const styles = StyleSheet.create({
 
   listContainer: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: colors.g50,
     borderRadius: radius.card,
     marginHorizontal: 16,
@@ -299,11 +291,12 @@ const styles = StyleSheet.create({
   },
 
   bottomBtns: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    flexShrink: 0,
     flexDirection: 'row',
     gap: 12,
-    flexShrink: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   homeBtn: {
     flex: 1,

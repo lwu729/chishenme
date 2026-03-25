@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ToastAndroid, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ToastAndroid, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -111,7 +111,15 @@ export default function BirdNestScreen() {
               onPress={() => handleSetActiveBird(bird.id)}
               activeOpacity={0.8}
             >
-              <Text style={styles.birdEmoji}>{bird.emoji}</Text>
+              {bird.profileImagePath ? (
+                <Image
+                  source={bird.profileImagePath}
+                  style={{ width: 60, height: 60, borderRadius: 30, marginRight: 14 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.birdEmoji}>{bird.emoji}</Text>
+              )}
               <View style={styles.birdInfo}>
                 <View style={styles.birdNameRow}>
                   <Text style={styles.birdName}>{isEn ? bird.nameEn : bird.nameZh}</Text>

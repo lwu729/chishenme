@@ -10,6 +10,7 @@ import {
   ToastAndroid,
   Modal,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -476,7 +477,15 @@ export default function RecipeDetailScreen() {
         {/* 小鸟贴士 */}
         <View style={styles.birdRow}>
           <View style={styles.birdAvatar}>
-            <Text style={styles.birdEmoji}>{birdEmoji}</Text>
+            {activeBird?.profileImagePath ? (
+              <Image
+                source={activeBird.profileImagePath}
+                style={{ width: 44, height: 44, borderRadius: 22 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.birdEmoji}>{birdEmoji}</Text>
+            )}
           </View>
           <View style={styles.birdTriangle} />
           <View style={styles.birdBubble}>

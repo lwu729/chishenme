@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Animated, Modal, View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, font, radius } from '../constants/theme';
 import { UnlockResult } from '../services/bird/unlockService';
+import { BIRDS_DATA } from '../data/birds';
 
 interface Props {
   visible: boolean;
@@ -32,13 +33,22 @@ export default function BirdUnlockModal({ visible, unlockResult, onSetAsCurrent,
   const isEn = i18n.language === 'en';
   const birdName = isEn ? unlockResult.birdNameEn : unlockResult.birdNameZh;
   const unlockDesc = isEn ? unlockResult.unlockDescriptionEn : unlockResult.unlockDescriptionZh;
+  const birdData = BIRDS_DATA.find(b => b.id === unlockResult.birdId);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={styles.overlay}>
         <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
           <Text style={styles.title}>🎉 {t('birdNest.unlockModalTitle')}</Text>
-          <Text style={styles.emoji}>{unlockResult.birdEmoji}</Text>
+          {birdData?.fullImagePath ? (
+            <Image
+              source={birdData.fullImagePath}
+              style={{ width: 120, height: 120, marginBottom: 12 }}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={styles.emoji}>{unlockResult.birdEmoji}</Text>
+          )}
           <Text style={styles.birdName}>{birdName}</Text>
           <Text style={styles.unlockDesc}>{unlockDesc}</Text>
           <TouchableOpacity

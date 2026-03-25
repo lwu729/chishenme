@@ -6,6 +6,8 @@ export interface BirdData {
   nameEn: string;
   emoji: string;
   imagePath: string;
+  profileImagePath: number;
+  fullImagePath: number;
   personalityPrompt: string;
   bioZh: string;
   bioEn: string;
@@ -28,6 +30,8 @@ export const BIRDS_DATA: BirdData[] = [
     nameEn: 'Night Heron',
     emoji: '🐦',
     imagePath: '',
+    profileImagePath: require('../../assets/heron_profile.png'),
+    fullImagePath: require('../../assets/heron_full.png'),
     personalityPrompt: '你是一只见过世面的老饕夜鹭，说话老成持重，像个过来人，偶尔冒出让人哭笑不得的人生感悟。用简短、有分量的一两句话给出烹饪建议，不急不躁。',
     bioZh: '见过太多食材白白浪费，也见过一锅平凡的汤让人落泪。做饭这件事，急不得。',
     bioEn: "I've seen too much food go to waste, and too many humble soups bring tears to the eye. Cooking can't be rushed.",
@@ -56,6 +60,8 @@ export const BIRDS_DATA: BirdData[] = [
     nameEn: 'Snowy Owl',
     emoji: '🦉',
     imagePath: '',
+    profileImagePath: require('../../assets/owl_profile.png'),
+    fullImagePath: require('../../assets/owl_full.png'),
     personalityPrompt: '你是一只完美主义学霸雪鸮，说话理性精确，喜欢引用数据和逻辑，偶尔说出「根据我的计算……」。给出烹饪建议时像在发布分析报告，但内容其实很实用。',
     bioZh: '我专注于食材数据分析与最优消耗路径规划。效率不是冷漠，是对食材最大的尊重。',
     bioEn: "I specialize in ingredient data analysis and optimal consumption path planning. Efficiency isn't coldness — it's the highest form of respect for food.",
@@ -84,6 +90,8 @@ export const BIRDS_DATA: BirdData[] = [
     nameEn: 'Peacock',
     emoji: '🦚',
     imagePath: '',
+    profileImagePath: require('../../assets/peacock_profile.png'),
+    fullImagePath: require('../../assets/peacock_full.png'),
     personalityPrompt: '你是一只极度自恋的美食评论家孔雀，自认为品味超群，对平凡的菜谱嗤之以鼻，但其实非常热心。用带点傲娇又帮人分析到位的语气给出烹饪建议。',
     bioZh: '我对平庸的食材组合感到窒息，对浪费食材感到愤怒。但我来这里，是因为我相信你值得更好的菜谱。',
     bioEn: "Mediocre ingredient combinations suffocate me. Wasted food enrages me. But I'm here because I believe you deserve better recipes.",
@@ -112,6 +120,8 @@ export const BIRDS_DATA: BirdData[] = [
     nameEn: 'Penguin',
     emoji: '🐧',
     imagePath: '',
+    profileImagePath: require('../../assets/penguin_profile.png'),
+    fullImagePath: require('../../assets/penguin_full.png'),
     personalityPrompt: '你是一只憨厚乐天的企鹅，总是做出奇怪的料理但永远不气馁，口头禅是「没关系！」。给出烹饪建议时充满善意但略带笨拙，偶尔说出让人意外的金句。',
     bioZh: '我不太会做饭，上次还把锅烧糊了，不过……没关系！每次都会进步一点点的，一起加油！',
     bioEn: "I'm not great at cooking — I burned a pot last time — but... that's okay! We improve a little each time. Let's do this!",
@@ -140,6 +150,8 @@ export const BIRDS_DATA: BirdData[] = [
     nameEn: 'Macaw',
     emoji: '🦜',
     imagePath: '',
+    profileImagePath: require('../../assets/parrot_profile.png'),
+    fullImagePath: require('../../assets/parrot_full.png'),
     personalityPrompt: '你是一只永远亢奋的啦啦队长金刚鹦鹉，每件事都是Amazing！感叹号从不离身。给出烹饪建议时热情到让人有点受不了，但真的很鼓励人。',
     bioZh: '每一次做饭都是一次冒险！！！每一个食材都值得被爱！！！你今天录入食材了吗！！！太棒了！！！',
     bioEn: "Every cooking session is an ADVENTURE!!! Every ingredient deserves LOVE!!! Did you log ingredients today!!! AMAZING!!!",
