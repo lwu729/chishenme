@@ -193,6 +193,14 @@ const en = {
     percentRange: 'Please enter a number between 1 and 99',
   },
 
+  recipeFilter: {
+    addCustomCuisine: 'Add Custom Cuisine',
+    addCustomMethod: 'Add Custom Cooking Method',
+    addCustomFlavor: 'Add Custom Flavor',
+    deleteTagConfirm: 'Delete this tag?',
+    inputPlaceholder: 'Enter name...',
+  },
+
   kitchenware: {
     title: 'Kitchen Setup',
     saveBtn: 'Save Settings',

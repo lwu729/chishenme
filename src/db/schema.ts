@@ -94,7 +94,13 @@ export const CREATE_USER_PREFERENCES_TABLE = `
     urgentAbsoluteDays            INTEGER NOT NULL DEFAULT 1,
     warningDays                   INTEGER NOT NULL DEFAULT 5,
     warningPercentage             INTEGER NOT NULL DEFAULT 75,
-    warningAbsoluteDays           INTEGER NOT NULL DEFAULT 3
+    warningAbsoluteDays           INTEGER NOT NULL DEFAULT 3,
+    customCuisinesZh              TEXT    NOT NULL DEFAULT '[]',
+    customCuisinesEn              TEXT    NOT NULL DEFAULT '[]',
+    customMethodsZh               TEXT    NOT NULL DEFAULT '[]',
+    customMethodsEn               TEXT    NOT NULL DEFAULT '[]',
+    customFlavorsZh               TEXT    NOT NULL DEFAULT '[]',
+    customFlavorsEn               TEXT    NOT NULL DEFAULT '[]'
   );
 `;
 

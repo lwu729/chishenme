@@ -229,4 +229,24 @@ export function initDatabase(): void {
   try {
     database.execSync('ALTER TABLE user_preferences ADD COLUMN warningAbsoluteDays INTEGER NOT NULL DEFAULT 3');
   } catch (_) {}
+
+  // 迁移：自定义菜谱标签字段
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customCuisinesZh TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customCuisinesEn TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customMethodsZh TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customMethodsEn TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customFlavorsZh TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
+  try {
+    database.execSync("ALTER TABLE user_preferences ADD COLUMN customFlavorsEn TEXT NOT NULL DEFAULT '[]'");
+  } catch (_) {}
 }

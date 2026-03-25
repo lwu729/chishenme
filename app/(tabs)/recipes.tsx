@@ -75,6 +75,12 @@ const DEFAULT_PREFERENCE: UserPreference = {
   warningDays: 5,
   warningPercentage: 75,
   warningAbsoluteDays: 3,
+  customCuisinesZh: [],
+  customCuisinesEn: [],
+  customMethodsZh: [],
+  customMethodsEn: [],
+  customFlavorsZh: [],
+  customFlavorsEn: [],
 };
 
 // ─── 水平 tag 行（多选，空数组 = 全部） ───
@@ -83,11 +89,17 @@ function TagRow({
   tags,
   selected,
   onToggle,
+  customTags = [],
+  onAddCustom,
+  onDeleteCustom,
 }: {
   allTag: string;
   tags: string[];
   selected: string[];
   onToggle: (tag: string) => void;
+  customTags?: string[];
+  onAddCustom?: () => void;
+  onDeleteCustom?: (tag: string) => void;
 }) {
   const [scrollX, setScrollX] = useState(0);
   const [contentW, setContentW] = useState(0);
@@ -102,8 +114,6 @@ function TagRow({
   const thumbLeft =
     maxScroll > 0 && trackW > thumbW ? (scrollX / maxScroll) * (trackW - thumbW) : 0;
 
-  const allItems = [allTag, ...tags];
-
   return (
     <View>
       <ScrollView
@@ -115,9 +125,42 @@ function TagRow({
         onContentSizeChange={w => setContentW(w)}
         onLayout={e => setViewportW(e.nativeEvent.layout.width)}
       >
-        {allItems.map(tag => {
-          const isAllTag = tag === allTag;
-          const active = isAllTag ? selected.length === 0 : selected.includes(tag);
+        {/* + 自定义按钮 */}
+        {onAddCustom && (
+          <TouchableOpacity style={styles.addTagBtn} onPress={onAddCustom}>
+            <Text style={styles.addTagBtnText}>+</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 全部 tag */}
+        <TouchableOpacity
+          style={[styles.tag, selected.length === 0 && styles.tagActive]}
+          onPress={() => onToggle(allTag)}
+        >
+          <Text style={[styles.tagText, selected.length === 0 && styles.tagTextActive]}>{allTag}</Text>
+        </TouchableOpacity>
+
+        {/* 自定义 tag（带 × 删除） */}
+        {customTags.map(tag => {
+          const active = selected.includes(tag);
+          return (
+            <View key={`custom-${tag}`} style={[styles.customTagPill, active && styles.tagActive]}>
+              <TouchableOpacity onPress={() => onToggle(tag)} activeOpacity={0.75}>
+                <Text style={[styles.tagText, active && styles.tagTextActive]}>{tag}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                onPress={() => onDeleteCustom?.(tag)}
+              >
+                <Text style={[styles.deleteTagX, active && styles.deleteTagXActive]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+
+        {/* 系统预设 tag */}
+        {tags.map(tag => {
+          const active = selected.includes(tag);
           return (
             <TouchableOpacity
               key={tag}
@@ -281,7 +324,8 @@ function RecipeCard({
 
 // ─── 主屏幕 ───
 export default function RecipesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isEn = i18n.language === 'en';
   const [showResults, setShowResults] = useState(false);
   const [showKitchenware, setShowKitchenware] = useState(false);
   const [cuisines, setCuisines] = useState<string[]>([]);
@@ -304,6 +348,107 @@ export default function RecipesScreen() {
     return () => { i18n.off('languageChanged', resetFilters); };
   }, []);
 
+  function promptAddCustomTag(type: 'cuisine' | 'method' | 'flavor') {
+    const titleKey =
+      type === 'cuisine'
+        ? 'recipeFilter.addCustomCuisine'
+        : type === 'method'
+        ? 'recipeFilter.addCustomMethod'
+        : 'recipeFilter.addCustomFlavor';
+    Alert.prompt(
+      t(titleKey),
+      undefined,
+      (text) => {
+        const trimmed = text?.trim();
+        if (!trimmed || !userPreference) return;
+        if (isEn) {
+          if (type === 'cuisine' && !userPreference.customCuisinesEn.includes(trimmed))
+            updateUserPreference({ customCuisinesEn: [...userPreference.customCuisinesEn, trimmed] });
+          else if (type === 'method' && !userPreference.customMethodsEn.includes(trimmed))
+            updateUserPreference({ customMethodsEn: [...userPreference.customMethodsEn, trimmed] });
+          else if (type === 'flavor' && !userPreference.customFlavorsEn.includes(trimmed))
+            updateUserPreference({ customFlavorsEn: [...userPreference.customFlavorsEn, trimmed] });
+        } else {
+          if (type === 'cuisine' && !userPreference.customCuisinesZh.includes(trimmed))
+            updateUserPreference({ customCuisinesZh: [...userPreference.customCuisinesZh, trimmed] });
+          else if (type === 'method' && !userPreference.customMethodsZh.includes(trimmed))
+            updateUserPreference({ customMethodsZh: [...userPreference.customMethodsZh, trimmed] });
+          else if (type === 'flavor' && !userPreference.customFlavorsZh.includes(trimmed))
+            updateUserPreference({ customFlavorsZh: [...userPreference.customFlavorsZh, trimmed] });
+        }
+      },
+      'plain-text',
+      '',
+    );
+  }
+
+  function handleDeleteCustomTag(type: 'cuisine' | 'method' | 'flavor', tagToDelete: string) {
+    Alert.alert(
+      t('recipeFilter.deleteTagConfirm'),
+      undefined,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            if (!userPreference) return;
+            if (isEn) {
+              if (type === 'cuisine')
+                updateUserPreference({ customCuisinesEn: userPreference.customCuisinesEn.filter(x => x !== tagToDelete) });
+              else if (type === 'method')
+                updateUserPreference({ customMethodsEn: userPreference.customMethodsEn.filter(x => x !== tagToDelete) });
+              else
+                updateUserPreference({ customFlavorsEn: userPreference.customFlavorsEn.filter(x => x !== tagToDelete) });
+            } else {
+              if (type === 'cuisine')
+                updateUserPreference({ customCuisinesZh: userPreference.customCuisinesZh.filter(x => x !== tagToDelete) });
+              else if (type === 'method')
+                updateUserPreference({ customMethodsZh: userPreference.customMethodsZh.filter(x => x !== tagToDelete) });
+              else
+                updateUserPreference({ customFlavorsZh: userPreference.customFlavorsZh.filter(x => x !== tagToDelete) });
+            }
+            // 同步移除已选中状态
+            if (type === 'cuisine') setCuisines(prev => prev.filter(x => x !== tagToDelete));
+            else if (type === 'method') setMethods(prev => prev.filter(x => x !== tagToDelete));
+            else setTastes(prev => prev.filter(x => x !== tagToDelete));
+          },
+        },
+      ],
+    );
+  }
+
+  function handleRandomize() {
+    // 随机选 0~1 个菜系
+    const allCuisines = [...cuisineOptions, ...customCuisines];
+    const randomCuisine = allCuisines.length > 0 && Math.random() < 0.7
+      ? [allCuisines[Math.floor(Math.random() * allCuisines.length)]]
+      : [];
+    setCuisines(randomCuisine);
+
+    // 随机选 0~1 个烹饪方式
+    const allMethods = [...methodOptions, ...customMethods];
+    const randomMethod = allMethods.length > 0 && Math.random() < 0.7
+      ? [allMethods[Math.floor(Math.random() * allMethods.length)]]
+      : [];
+    setMethods(randomMethod);
+
+    // 随机选 0~1 个口味
+    const allFlavors = [...flavorOptions, ...customFlavors];
+    const randomFlavor = allFlavors.length > 0 && Math.random() < 0.7
+      ? [allFlavors[Math.floor(Math.random() * allFlavors.length)]]
+      : [];
+    setTastes(randomFlavor);
+
+    // 随机打乱食材 include/exclude 状态
+    resetAllFilterStates();
+    const shuffled = [...ingredients].sort(() => Math.random() - 0.5);
+    const includeCount = Math.floor(Math.random() * Math.min(5, shuffled.length) + 1);
+    shuffled.slice(0, includeCount).forEach(ing => setFilterState(ing.id, IngredientFilterState.INCLUDE));
+
+    showToast(t('recipes.randomDone'), t('common.ok'));
+  }
+
   function toggleTag(
     tag: string,
     current: string[],
@@ -316,7 +461,7 @@ export default function RecipesScreen() {
     }
   }
 
-  const { ingredients, loadIngredients } = useIngredientStore();
+  const { ingredients, loadIngredients, setFilterState, resetAllFilterStates } = useIngredientStore();
   const {
     currentRecipes,
     favoritedRecipes,
@@ -327,7 +472,18 @@ export default function RecipesScreen() {
     loadFavoritedRecipes,
     lastGenerationSnapshot,
   } = useRecipeStore();
-  const { userPreference, loadUserPreference } = useUserStore();
+  const { userPreference, loadUserPreference, updateUserPreference } = useUserStore();
+
+  // 当前语言对应的自定义 tag
+  const customCuisines = isEn
+    ? (userPreference?.customCuisinesEn ?? [])
+    : (userPreference?.customCuisinesZh ?? []);
+  const customMethods = isEn
+    ? (userPreference?.customMethodsEn ?? [])
+    : (userPreference?.customMethodsZh ?? []);
+  const customFlavors = isEn
+    ? (userPreference?.customFlavorsEn ?? [])
+    : (userPreference?.customFlavorsZh ?? []);
 
   const userChoseFilterRef = useRef(false);
 
@@ -520,6 +676,9 @@ export default function RecipesScreen() {
             tags={cuisineOptions}
             selected={cuisines}
             onToggle={tag => toggleTag(tag, cuisines, setCuisines)}
+            customTags={customCuisines}
+            onAddCustom={() => promptAddCustomTag('cuisine')}
+            onDeleteCustom={tag => handleDeleteCustomTag('cuisine', tag)}
           />
         </View>
 
@@ -530,6 +689,9 @@ export default function RecipesScreen() {
             tags={methodOptions}
             selected={methods}
             onToggle={tag => toggleTag(tag, methods, setMethods)}
+            customTags={customMethods}
+            onAddCustom={() => promptAddCustomTag('method')}
+            onDeleteCustom={tag => handleDeleteCustomTag('method', tag)}
           />
         </View>
 
@@ -540,6 +702,9 @@ export default function RecipesScreen() {
             tags={flavorOptions}
             selected={tastes}
             onToggle={tag => toggleTag(tag, tastes, setTastes)}
+            customTags={customFlavors}
+            onAddCustom={() => promptAddCustomTag('flavor')}
+            onDeleteCustom={tag => handleDeleteCustomTag('flavor', tag)}
           />
         </View>
 
@@ -548,7 +713,7 @@ export default function RecipesScreen() {
           <IngredientGrid mode="exclude" />
         </View>
 
-        <TouchableOpacity style={styles.randBtn} onPress={() => showToast(t('recipes.randomDone'), t('common.ok'))}>
+        <TouchableOpacity style={styles.randBtn} onPress={handleRandomize}>
           <Text style={styles.randBtnText}>{t('recipes.random')}</Text>
         </TouchableOpacity>
 
@@ -652,6 +817,44 @@ const styles = StyleSheet.create({
   },
   tagTextActive: {
     color: '#FFFFFF',
+  },
+  addTagBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.tag,
+    borderWidth: 1.5,
+    borderColor: colors.g600,
+    backgroundColor: colors.backgroundCard,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addTagBtnText: {
+    fontSize: 15,
+    color: colors.g600,
+    fontFamily: font.family,
+    fontWeight: font.medium,
+    lineHeight: 18,
+  },
+  customTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingLeft: 14,
+    paddingRight: 8,
+    borderRadius: radius.tag,
+    borderWidth: 1.5,
+    borderColor: colors.g200,
+    backgroundColor: colors.backgroundCard,
+  },
+  deleteTagX: {
+    fontSize: 14,
+    color: colors.g400,
+    fontFamily: font.family,
+    lineHeight: 18,
+  },
+  deleteTagXActive: {
+    color: 'rgba(255,255,255,0.7)',
   },
   hTrack: {
     height: 3,

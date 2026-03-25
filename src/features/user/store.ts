@@ -54,6 +54,12 @@ function rowToPreference(row: any): UserPreference {
     warningDays: row.warningDays ?? 5,
     warningPercentage: row.warningPercentage ?? 75,
     warningAbsoluteDays: row.warningAbsoluteDays ?? 3,
+    customCuisinesZh: JSON.parse(row.customCuisinesZh ?? '[]'),
+    customCuisinesEn: JSON.parse(row.customCuisinesEn ?? '[]'),
+    customMethodsZh: JSON.parse(row.customMethodsZh ?? '[]'),
+    customMethodsEn: JSON.parse(row.customMethodsEn ?? '[]'),
+    customFlavorsZh: JSON.parse(row.customFlavorsZh ?? '[]'),
+    customFlavorsEn: JSON.parse(row.customFlavorsEn ?? '[]'),
   };
 }
 
@@ -160,6 +166,9 @@ export const useUserStore = create<UserStore>((set, get) => ({
       'cookingTools', 'cookingAppliances', 'knives', 'assistiveTools',
       'measuringTools', 'condiments', 'preferredCuisines',
       'preferredCookingMethods', 'preferredFlavors',
+      'customCuisinesZh', 'customCuisinesEn',
+      'customMethodsZh', 'customMethodsEn',
+      'customFlavorsZh', 'customFlavorsEn',
     ];
     for (const field of jsonFields) {
       if (field in updates) {

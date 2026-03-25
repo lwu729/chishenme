@@ -193,6 +193,14 @@ const zh = {
     percentRange: '请输入 1-99 之间的整数',
   },
 
+  recipeFilter: {
+    addCustomCuisine: '添加自定义菜系',
+    addCustomMethod: '添加自定义烹饪方式',
+    addCustomFlavor: '添加自定义口味',
+    deleteTagConfirm: '删除这个标签吗？',
+    inputPlaceholder: '输入名称...',
+  },
+
   kitchenware: {
     title: '厨具设定',
     saveBtn: '保存设定',
