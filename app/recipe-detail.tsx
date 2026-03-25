@@ -9,6 +9,7 @@ import {
   Alert,
   ToastAndroid,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -168,26 +169,31 @@ export default function RecipeDetailScreen() {
     if (!recipe || !activeBird) return;
     if (Object.keys(birdTips).length > 0) return;
     setTipsLoading(true);
-    const results = await Promise.allSettled(
-      recipe.steps.map((step, index) =>
-        generateBirdCookingTip(
-          step.instruction,
-          activeBird.personalityPrompt,
-          i18n.language as 'zh' | 'en',
-        ).then(tip => ({ index, tip }))
-      )
-    );
-    const newTips: Record<number, string> = {};
-    results.forEach(result => {
-      if (result.status === 'fulfilled') {
-        newTips[result.value.index] = result.value.tip;
-      }
-    });
-    recipe.steps.forEach((_, index) => {
-      if (!newTips[index]) newTips[index] = getRandomGreeting();
-    });
-    setBirdTips(newTips);
+
+    // 先等第 0 步加载完再返回（让调用方决定何时跳转）
+    try {
+      const firstTip = await generateBirdCookingTip(
+        recipe.steps[0].instruction,
+        activeBird.personalityPrompt,
+        i18n.language as 'zh' | 'en',
+      );
+      setBirdTips(prev => ({ ...prev, [0]: firstTip }));
+    } catch {
+      setBirdTips(prev => ({ ...prev, [0]: getRandomGreeting() }));
+    }
     setTipsLoading(false);
+
+    // 其余步骤在 background 继续加载，不阻塞跳转
+    recipe.steps.slice(1).forEach((step, i) => {
+      const index = i + 1;
+      generateBirdCookingTip(
+        step.instruction,
+        activeBird.personalityPrompt,
+        i18n.language as 'zh' | 'en',
+      )
+        .then(tip => setBirdTips(prev => ({ ...prev, [index]: tip })))
+        .catch(() => setBirdTips(prev => ({ ...prev, [index]: getRandomGreeting() })));
+    });
   }
 
   if (!recipe) {
@@ -298,16 +304,24 @@ export default function RecipeDetailScreen() {
 
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => {
-              preloadAllTips();
+            style={[styles.primaryBtn, tipsLoading && { opacity: 0.6 }]}
+            onPress={async () => {
               setCurrentStep(0);
               setShowCompletion(false);
+              await preloadAllTips();
               setView('steps');
             }}
+            disabled={tipsLoading}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryBtnText}>{t('recipeDetail.startCooking')}</Text>
+            {tipsLoading ? (
+              <View style={styles.btnLoading}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.primaryBtnText}>{t('recipeDetail.startCooking')}</Text>
+              </View>
+            ) : (
+              <Text style={styles.primaryBtnText}>{t('recipeDetail.startCooking')}</Text>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -727,6 +741,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   doneBtn: {
     backgroundColor: colors.g400,
