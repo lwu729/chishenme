@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import * as FileSystem from 'expo-file-system';
 import { Ingredient, StorageLocation, IngredientFilterState } from './types';
 import { getDatabase } from '../../db/database';
 import { calculateExpiryStatus, calculateDaysUntilExpiry, DEFAULT_THRESHOLDS, ExpiryThresholds } from '../../utils/expiryUtils';
@@ -72,40 +71,6 @@ export const useIngredientStore = create<IngredientStore>((set, get) => ({
     });
 
     set({ ingredients });
-
-    // 异步验证绝对路径是否仍然有效（iOS 沙盒路径重启后可能变化）
-    (async () => {
-      for (const ing of ingredients) {
-        if (!ing.imagePath) continue;
-        const isAbsolute = ing.imagePath.startsWith('file://') || ing.imagePath.startsWith('/var/mobile') || ing.imagePath.startsWith('/private/var');
-        if (!isAbsolute) continue;
-        try {
-          const info = await FileSystem.getInfoAsync(ing.imagePath);
-          if (!info.exists) {
-            db.runSync('UPDATE ingredients SET imagePath = NULL WHERE id = ?', [ing.id]);
-          }
-        } catch {
-          db.runSync('UPDATE ingredients SET imagePath = NULL WHERE id = ?', [ing.id]);
-        }
-      }
-      // 如果有路径失效，重新加载（不递归触发路径检查）
-      const updated = db.getAllSync<Ingredient & { imageCrop: string | null }>('SELECT * FROM ingredients');
-      const hasChange = updated.some((r, i) => r.imagePath !== ingredients[i]?.imagePath);
-      if (hasChange) {
-        const fixed = updated.map(row => {
-          const days = calculateDaysUntilExpiry(row.expiryDate);
-          const status = calculateExpiryStatus(days, row.remainingPercentage, thresholds);
-          let imageCrop: Ingredient['imageCrop'] = null;
-          try { if (row.imageCrop) imageCrop = JSON.parse(row.imageCrop); } catch (_) {}
-          return { ...row, daysUntilExpiry: days, expiryStatus: status, imageCrop };
-        });
-        fixed.sort((a, b) => {
-          const diff = EXPIRY_SORT_ORDER[a.expiryStatus] - EXPIRY_SORT_ORDER[b.expiryStatus];
-          return diff !== 0 ? diff : a.daysUntilExpiry - b.daysUntilExpiry;
-        });
-        set({ ingredients: fixed });
-      }
-    })();
   },
 
   addIngredient: (input) => {
