@@ -28,7 +28,7 @@ function showToast(msg: string, okText = 'OK') {
 }
 
 const { width: SW } = Dimensions.get('window');
-const BIRD_SIZE = Math.min(160, SW * 0.42);
+const BIRD_SIZE = Math.min(185, SW * 0.48);
 
 // 根据食材名推导展示用 emoji
 const EMOJI_MAP: Record<string, string> = {
@@ -187,7 +187,8 @@ const styles = StyleSheet.create({
   birdSection: {
     flexShrink: 0,
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingTop: 4,
+    paddingBottom: 16,
   },
   birdCircle: {
     backgroundColor: colors.g100,
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    marginTop: 6,
+    marginTop: 12,
     marginBottom: 4,
     maxWidth: 280,
     alignSelf: 'center',
