@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import { Ingredient, ExpiryStatus } from '../../src/features/ingredient/types';
 import { useIngredientStore } from '../../src/features/ingredient/store';
@@ -143,7 +144,17 @@ function EditModal({
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      try {
+        const filename = `ingredient_${Date.now()}.jpg`;
+        const dest = `${FileSystem.documentDirectory}${filename}`;
+        await FileSystem.copyAsync({ from: uri, to: dest });
+        setImageUri(dest);
+      } catch {
+        setImageUri(uri);
+      }
+    }
   }
 
   function handleSave() {

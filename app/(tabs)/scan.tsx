@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import { useIngredientStore, AddIngredientInput } from '../../src/features/ingredient/store';
@@ -32,6 +33,13 @@ function showToast(msg: string, okText = 'OK') {
   } else {
     Alert.alert('', msg, [{ text: okText }]);
   }
+}
+
+async function persistImage(uri: string): Promise<string> {
+  const filename = `ingredient_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`;
+  const dest = `${FileSystem.documentDirectory}${filename}`;
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  return dest;
 }
 
 function formatDate(d: Date): string {
@@ -352,15 +360,19 @@ function ManualInputSheet({
     if (!result.canceled) setImageUri(result.assets[0].uri);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) { showToast(t('scan.pleaseInputName'), t('common.ok')); return; }
     if (quantity <= 0) { showToast(t('scan.quantityNotZero'), t('common.ok')); return; }
+    let persistedPath: string | undefined = imageUri ?? undefined;
+    if (persistedPath) {
+      try { persistedPath = await persistImage(persistedPath); } catch { /* keep original */ }
+    }
     onSave({
       name: name.trim(),
       quantity,
       unit: unit.trim() || '份',
       expiryDate: formatDate(expiryDate),
-      imagePath: imageUri ?? undefined,
+      imagePath: persistedPath,
     });
   }
 
@@ -550,8 +562,12 @@ export default function ScanScreen() {
     }
   }
 
-  function handleConfirmSave(input: AddIngredientInput & { imagePath: string }) {
-    addIngredient(input);
+  async function handleConfirmSave(input: AddIngredientInput & { imagePath: string }) {
+    let persistedPath = input.imagePath;
+    if (persistedPath) {
+      try { persistedPath = await persistImage(persistedPath); } catch { /* keep original */ }
+    }
+    addIngredient({ ...input, imagePath: persistedPath });
     const next = currentIndex + 1;
     setSavedCount(c => c + 1);
     if (next >= scanQueue.length) {
